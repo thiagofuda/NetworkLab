@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}IP Information | NetworkLab{% endblock %}
+
+{% block content %}
+  <h1 class="mb-4">IP Information</h1>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <dl class="row mb-0">
+        <dt class="col-sm-3">IP address</dt>
+        <dd class="col-sm-9">{{ ip_information.ip_address }}</dd>
+
+        <dt class="col-sm-3">User-Agent</dt>
+        <dd class="col-sm-9 text-break">{{ ip_information.user_agent }}</dd>
+
+        <dt class="col-sm-3">Request date and time</dt>
+        <dd class="col-sm-9">
+          <time datetime="{{ ip_information.requested_at.isoformat() }}">
+            {{ ip_information.requested_at.isoformat() }}
+          </time>
+        </dd>
+      </dl>
+    </div>
+  </div>
+
+  <h2 class="h4 mb-3">Request headers</h2>
+  <div class="table-responsive">
+    <table class="table table-striped table-bordered align-middle">
+      <caption class="visually-hidden">HTTP request headers</caption>
+      <thead class="table-dark">
+        <tr>
+          <th scope="col">Header</th>
+          <th scope="col">Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for name, value in ip_information.headers.items() %}
+          <tr>
+            <th scope="row">{{ name }}</th>
+            <td class="text-break">{{ value }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
+

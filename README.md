@@ -39,3 +39,27 @@ The first version focuses on building the project structure and creating the fou
 * Build a useful and maintainable project.
 
 Contributions, suggestions and feedback are always welcome.
+
+## Ferramentas disponíveis
+
+### IP Information
+
+Exibe o endereço IP do cliente, User-Agent, cabeçalhos HTTP e a data e hora da
+requisição.
+
+- Interface web: `GET /tools/ip`
+- API JSON: `GET /api/ip`
+
+Exemplo de resposta da API:
+
+```json
+{
+  "ip_address": "127.0.0.1",
+  "user_agent": "curl/8.0.0",
+  "headers": {
+    "host": "localhost:8000",
+    "user-agent": "curl/8.0.0"
+  },
+  "requested_at": "2026-07-31T18:00:00+00:00"
+}
+```

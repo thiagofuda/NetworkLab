@@ -9,3 +9,4 @@ htmlcov/
 .coverage
 AGENTS.md
 .editorconfig
+docs/
