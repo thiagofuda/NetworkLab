@@ -14,5 +14,6 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    # Reaproveita a mesma instancia de configuracao durante o ciclo da aplicacao.
     return Settings()
 
