@@ -31,3 +31,25 @@ jobs:
 
       - name: Build Docker image
         run: docker build -t networklab:ci .
+
+      - name: Test container startup
+        run: |
+          trap 'docker rm --force networklab-ci >/dev/null 2>&1 || true' EXIT
+          docker run --detach --name networklab-ci --publish 127.0.0.1:18000:8000 networklab:ci
+
+          for attempt in $(seq 1 15); do
+            health_status=$(docker inspect --format='{{.State.Health.Status}}' networklab-ci)
+            if [ "$health_status" = "healthy" ]; then
+              python -c "from urllib.request import urlopen; assert urlopen('http://127.0.0.1:18000/health', timeout=3).status == 200"
+              exit 0
+            fi
+            container_status=$(docker inspect --format='{{.State.Status}}' networklab-ci)
+            if [ "$container_status" = "exited" ]; then
+              docker logs networklab-ci
+              exit 1
+            fi
+            sleep 2
+          done
+
+          docker logs networklab-ci
+          exit 1

@@ -1,4 +1,4 @@
-from app.services.ip_service import REDACTED_HEADER_VALUE, get_ip_information
+from app.services.ip_service import get_ip_information
 
 
 def test_ip_service_handles_missing_client_and_user_agent() -> None:
@@ -14,19 +14,18 @@ def test_ip_service_handles_missing_client_and_user_agent() -> None:
     assert ip_information.headers == {}
 
 
-def test_ip_service_redacts_sensitive_headers() -> None:
-    # Valida a regra de seguranca que protege dados sensiveis em headers.
+def test_ip_service_returns_only_allowlisted_headers() -> None:
+    # Evita publicar headers de autenticacao ou campos customizados desconhecidos.
     ip_information = get_ip_information(
         client_ip_address="127.0.0.1",
         user_agent="NetworkLab Test",
         headers={
             "authorization": "Bearer secret-token",
             "cookie": "session=secret-value",
-            "x-test-header": "visible-value",
+            "x-auth-token": "custom-secret",
+            "accept-language": "en-US",
         },
     )
 
-    assert ip_information.headers["authorization"] == REDACTED_HEADER_VALUE
-    assert ip_information.headers["cookie"] == REDACTED_HEADER_VALUE
-    assert ip_information.headers["x-test-header"] == "visible-value"
+    assert ip_information.headers == {"accept-language": "en-US"}
 

@@ -3,13 +3,13 @@ from datetime import UTC, datetime
 
 from app.schemas.ip import IpInformation
 
-SENSITIVE_HEADERS = {
-    "authorization",
-    "cookie",
-    "proxy-authorization",
-    "x-api-key",
+DISPLAYED_HEADERS = {
+    "accept",
+    "accept-encoding",
+    "accept-language",
+    "content-type",
+    "host",
 }
-REDACTED_HEADER_VALUE = "[REDACTED]"
 
 
 def get_ip_information(
@@ -17,16 +17,17 @@ def get_ip_information(
     user_agent: str | None,
     headers: Mapping[str, str],
 ) -> IpInformation:
-    # Reduz risco de vazamento de dados sensíveis em respostas e logs.
-    safe_headers = {
-        name: REDACTED_HEADER_VALUE if name.lower() in SENSITIVE_HEADERS else value
+    # Expõe somente metadados comuns, evitando headers customizados com segredos.
+    displayed_headers = {
+        name: value
         for name, value in headers.items()
+        if name.lower() in DISPLAYED_HEADERS
     }
 
     return IpInformation(
         ip_address=client_ip_address or "unknown",
         user_agent=user_agent or "unknown",
-        headers=safe_headers,
+        headers=displayed_headers,
         # Padroniza o timestamp em UTC para evitar ambiguidades entre fusos.
         requested_at=datetime.now(UTC),
     )
