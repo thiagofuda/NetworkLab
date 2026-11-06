@@ -11,5 +11,7 @@ __pycache__
 htmlcov
 tests
 compose.yaml
+compose.prod.yaml
+compose.bootstrap.yaml
 Dockerfile*
 

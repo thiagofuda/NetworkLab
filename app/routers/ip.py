@@ -9,7 +9,8 @@ from app.services.ip_service import get_ip_information
 
 router = APIRouter()
 
-# Resolve o caminho do diretório de templates relativo ao pacote para funcionar em diferentes ambientes.
+# Resolve o caminho dos templates relativo ao pacote para funcionar em diferentes
+# ambientes.
 templates_directory = Path(__file__).parent.parent / "templates"
 templates = Jinja2Templates(directory=templates_directory)
 
