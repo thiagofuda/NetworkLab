@@ -53,3 +53,93 @@ jobs:
 
           docker logs networklab-ci
           exit 1
+
+  publish:
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/sprint_4' || github.ref == 'refs/heads/main')
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build and publish image
+        env:
+          IMAGE_NAME: ghcr.io/thiagofuda/networklab
+        run: |
+          docker build --tag "$IMAGE_NAME:$GITHUB_SHA" .
+          docker push "$IMAGE_NAME:$GITHUB_SHA"
+
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            docker tag "$IMAGE_NAME:$GITHUB_SHA" "$IMAGE_NAME:latest"
+            docker push "$IMAGE_NAME:latest"
+          fi
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: publish
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    env:
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+      IMAGE_NAME: ghcr.io/thiagofuda/networklab
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - name: Check production settings
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_KNOWN_HOSTS"
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+        run: |
+          test -n "$DEPLOY_SSH_PRIVATE_KEY"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+
+      - name: Copy production Compose file
+        run: scp -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o StrictHostKeyChecking=yes compose.prod.yaml "$DEPLOY_USER@$DEPLOY_HOST:/opt/networklab/compose.prod.yaml"
+
+      - name: Deploy image with rollback on failed health check
+        run: |
+          ssh -i "$HOME/.ssh/id_ed25519" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "IMAGE_NAME='$IMAGE_NAME' IMAGE_TAG='$IMAGE_TAG' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/networklab
+
+          compose_file=/opt/networklab/compose.prod.yaml
+          api_container=$(docker compose -f "$compose_file" ps -q api)
+          previous_image=$(docker inspect --format='{{.Image}}' "$api_container")
+          docker image tag "$previous_image" "${IMAGE_NAME}:rollback"
+
+          docker compose -f "$compose_file" pull api
+          if ! docker compose -f "$compose_file" up -d --no-deps --wait api; then
+            IMAGE_TAG=rollback docker compose -f "$compose_file" up -d --no-deps --wait api
+            docker compose -f "$compose_file" restart nginx
+            exit 1
+          fi
+
+          docker compose -f "$compose_file" restart nginx
+          REMOTE
