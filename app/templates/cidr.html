@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}CIDR Calculator | NetworkLab{% endblock %}
+
+{% block content %}
+  <h1 class="mb-4">CIDR Calculator</h1>
+
+  <form method="get" action="/tools/cidr" class="mb-4">
+    <div class="mb-3">
+      <label for="cidr" class="form-label">IPv4 or IPv6 network</label>
+      <input
+        type="text"
+        class="form-control"
+        id="cidr"
+        name="cidr"
+        value="{{ cidr }}"
+        placeholder="192.168.10.25/24"
+        aria-describedby="cidr-help"
+        required
+      >
+      <div id="cidr-help" class="form-text">Enter an IP address with a CIDR prefix.</div>
+    </div>
+    <button type="submit" class="btn btn-primary">Calculate</button>
+  </form>
+
+  {% if error_message %}
+    <div class="alert alert-danger" role="alert">{{ error_message }}</div>
+  {% endif %}
+
+  {% if cidr_information %}
+    <h2 class="h4 mb-3">Network details</h2>
+    <dl class="row">
+      <dt class="col-sm-4">IP version</dt>
+      <dd class="col-sm-8">IPv{{ cidr_information.ip_version }}</dd>
+
+      <dt class="col-sm-4">Network address</dt>
+      <dd class="col-sm-8"><code>{{ cidr_information.network_address }}</code></dd>
+
+      <dt class="col-sm-4">Prefix length</dt>
+      <dd class="col-sm-8">/{{ cidr_information.prefix_length }}</dd>
+
+      <dt class="col-sm-4">Total addresses</dt>
+      <dd class="col-sm-8">{{ cidr_information.total_addresses }}</dd>
+
+      {% if cidr_information.netmask %}
+        <dt class="col-sm-4">Netmask</dt>
+        <dd class="col-sm-8"><code>{{ cidr_information.netmask }}</code></dd>
+      {% endif %}
+
+      {% if cidr_information.broadcast_address %}
+        <dt class="col-sm-4">Broadcast address</dt>
+        <dd class="col-sm-8"><code>{{ cidr_information.broadcast_address }}</code></dd>
+      {% endif %}
+    </dl>
+  {% endif %}
+{% endblock %}

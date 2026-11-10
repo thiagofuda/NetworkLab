@@ -24,7 +24,6 @@ The first version focuses on building the project structure and creating the fou
 * DNS Lookup
 * SSL Certificate Checker
 * Port Checker
-* CIDR Calculator
 * HTTP Request Inspector
 * JWT Decoder
 * Base64 Encoder / Decoder
@@ -63,3 +62,29 @@ Exemplo de resposta da API:
   "requested_at": "2026-07-31T18:00:00+00:00"
 }
 ```
+
+### CIDR Calculator
+
+Calcula informacoes de redes IPv4 e IPv6 sem fazer consultas externas.
+
+- Interface web: `GET /tools/cidr?cidr=192.168.10.25%2F24`
+- API JSON: `GET /api/cidr?cidr=192.168.10.25%2F24`
+- Entrada IPv6: `2001:db8::1/64`
+- Entradas invalidas retornam HTTP `422` na API.
+
+Exemplo de resposta IPv4:
+
+```json
+{
+  "input": "192.168.10.25/24",
+  "ip_version": 4,
+  "network_address": "192.168.10.0",
+  "prefix_length": 24,
+  "total_addresses": "256",
+  "netmask": "255.255.255.0",
+  "broadcast_address": "192.168.10.255"
+}
+```
+
+Para IPv6, `netmask` e `broadcast_address` sao `null`. O total de enderecos e
+representado como texto para preservar valores grandes, como os de redes IPv6.
