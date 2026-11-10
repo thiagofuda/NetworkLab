@@ -17,7 +17,7 @@ def get_ip_information(
     user_agent: str | None,
     headers: Mapping[str, str],
 ) -> IpInformation:
-    # Expõe somente metadados comuns, evitando headers customizados com segredos.
+    # Expoe somente metadados comuns, evitando headers customizados
     displayed_headers = {
         name: value
         for name, value in headers.items()
@@ -28,7 +28,7 @@ def get_ip_information(
         ip_address=client_ip_address or "unknown",
         user_agent=user_agent or "unknown",
         headers=displayed_headers,
-        # Padroniza o timestamp em UTC para evitar ambiguidades entre fusos.
+        # Padroniza o timestamp em UTC
         requested_at=datetime.now(UTC),
     )
 

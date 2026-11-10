@@ -7,11 +7,11 @@
 
 # Sprint 2
 
-- [ ] Página IP Informação de IP
-- [ ] API /api/ip
-- [ ] Template Bootstrap
-- [ ] Testes
-- [ ] Atualizar README
+- [x] Página IP Informação de IP
+- [x] API /api/ip
+- [x] Template Bootstrap
+- [x] Testes
+- [x] Atualizar README
 
 # Sprint 3
 
@@ -20,3 +20,9 @@
 # Sprint 4
 
 - [ ] SSL Checker
+
+# Sprint 5
+
+- [x] CIDR Calculator para IPv4 e IPv6
+- [x] Interface web e API JSON
+- [x] Testes de serviço, API e entradas inválidas
