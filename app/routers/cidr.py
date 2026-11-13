@@ -13,7 +13,7 @@ templates = Jinja2Templates(directory=templates_directory)
 INVALID_CIDR_MESSAGE = "Enter a valid IPv4 or IPv6 address with a CIDR prefix."
 
 
-@router.get("/tools/cidr", response_class=HTMLResponse)
+@router.get("/tools/cidr", response_class=HTMLResponse, include_in_schema=False)
 async def show_cidr_calculator(
     request: Request,
     cidr: str | None = None,
