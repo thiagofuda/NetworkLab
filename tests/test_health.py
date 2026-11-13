@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.core.config import Settings
+from app.main import app, create_app
 
 client = TestClient(app)
 
@@ -11,3 +12,16 @@ def test_health_check() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_openapi_uses_infralab_identity(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.main.get_settings",
+        lambda: Settings(app_name="InfraLab"),
+    )
+    response = TestClient(create_app()).get("/openapi.json")
+    api_info = response.json()["info"]
+
+    assert response.status_code == 200
+    assert api_info["title"] == "InfraLab"
+    assert "infrastructure troubleshooting" in api_info["description"]

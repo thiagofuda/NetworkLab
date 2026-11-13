@@ -16,6 +16,7 @@ def test_ip_page_displays_request_information() -> None:
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
+    assert "IP Information | InfraLab" in response.text
     assert "IP Information" in response.text
     assert "testclient" in response.text
     assert "NetworkLab Test" in response.text

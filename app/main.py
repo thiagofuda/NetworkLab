@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
 from app.core.config import get_settings
@@ -13,8 +16,18 @@ def create_app() -> FastAPI:
     settings = get_settings()
     application = FastAPI(
         title=settings.app_name,
+        description=(
+            "Simple, open-source tools for infrastructure troubleshooting, "
+            "cloud operations, and automation."
+        ),
         debug=settings.app_debug,
         version="0.1.0",
+    )
+    static_directory = Path(__file__).parent / "static"
+    application.mount(
+        "/static",
+        StaticFiles(directory=static_directory),
+        name="static",
     )
     # Cada router é registrado aqui para manter o ponto de entrada explícito.
     application.include_router(home_router)

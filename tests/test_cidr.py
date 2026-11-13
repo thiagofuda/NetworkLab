@@ -63,6 +63,7 @@ def test_cidr_page_displays_form_without_results() -> None:
     response = client.get("/tools/cidr")
 
     assert response.status_code == 200
+    assert "CIDR Calculator | InfraLab" in response.text
     assert "CIDR Calculator" in response.text
     assert 'name="cidr"' in response.text
     assert "Network details" not in response.text

@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = "NetworkLab API"
+    app_name: str = "InfraLab"
     app_env: Literal["development", "test", "production"] = "development"
     app_debug: bool = False
 

@@ -3,9 +3,86 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>NetworkLab</title>
+    <meta
+      name="description"
+      content="Simple, open-source tools for infrastructure troubleshooting, cloud operations, and automation."
+    >
+    <meta property="og:title" content="InfraLab | Infrastructure Tools &amp; Diagnostics">
+    <meta
+      property="og:description"
+      content="Simple, open-source tools for infrastructure troubleshooting, cloud operations, and automation."
+    >
+    <link rel="canonical" href="https://xdb.com.br/">
+    <title>InfraLab | Infrastructure Tools &amp; Diagnostics</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/home.css') }}">
   </head>
-  <body>
-    <h1>NetworkLab</h1>
+  <body class="landing-page">
+    <header class="site-header">
+      <div class="brand">
+        <a class="brand-name" href="/">InfraLab</a>
+        <span>-</span>
+        <a class="author-link" href="/about">Thiago Fuda</a>
+      </div>
+      <nav class="project-links" aria-label="GitHub repositories">
+        <a
+          class="github-link"
+          href="https://github.com/thiagofuda/NetworkLab"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          InfraLab GitHub
+        </a>
+        <a
+          class="github-link"
+          href="https://github.com/thiagofuda/homeLab"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          homeLab GitHub
+        </a>
+      </nav>
+    </header>
+
+    <main class="page-shell">
+      <h1 class="page-description">Infrastructure Tools &amp; Diagnostics</h1>
+      <p class="intro-copy">
+        Simple, open-source tools for infrastructure troubleshooting, cloud
+        operations, and automation.
+      </p>
+
+      <ul class="tool-list" aria-label="Network tools">
+        <li>
+          <a class="tool-item" href="/tools/ip">
+            <span class="tool-copy">
+              <strong>IP Information</strong>
+              <span>View the address and request details seen by the service.</span>
+            </span>
+          </a>
+        </li>
+        <li>
+          <a class="tool-item" href="/tools/cidr">
+            <span class="tool-copy">
+              <strong>CIDR Calculator</strong>
+              <span>Calculate IPv4 and IPv6 networks.</span>
+            </span>
+          </a>
+        </li>
+        <li>
+          <a class="tool-item" href="/tools/dns">
+            <span class="tool-copy">
+              <strong>DNS Lookup</strong>
+              <span>Look up public DNS records and TTL values.</span>
+            </span>
+          </a>
+        </li>
+        <li class="tool-item upcoming-item">
+          <span class="tool-copy">
+            <strong>SSL/TLS Checker</strong>
+            <span>Review certificate details and connection security.</span>
+          </span>
+          <span class="coming-soon">Coming soon</span>
+        </li>
+      </ul>
+    </main>
   </body>
 </html>
