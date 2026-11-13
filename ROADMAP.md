@@ -15,8 +15,6 @@
 
 # Sprint 3
 
-- [ ] DNS Lookup
-
 # Sprint 4
 
 - [ ] SSL Checker
@@ -26,3 +24,7 @@
 - [x] CIDR Calculator para IPv4 e IPv6
 - [x] Interface web e API JSON
 - [x] Testes de serviço, API e entradas inválidas
+
+# Sprint 6
+
+- [x] DNS Lookup

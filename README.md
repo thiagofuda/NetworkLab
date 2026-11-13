@@ -21,7 +21,6 @@ The first version focuses on building the project structure and creating the fou
 ## Planned Tools
 
 * What's My IP
-* DNS Lookup
 * SSL Certificate Checker
 * Port Checker
 * HTTP Request Inspector
@@ -88,3 +87,33 @@ Exemplo de resposta IPv4:
 
 Para IPv6, `netmask` e `broadcast_address` sao `null`. O total de enderecos e
 representado como texto para preservar valores grandes, como os de redes IPv6.
+
+### DNS Lookup
+
+Consulta registros DNS publicos usando o resolver configurado no sistema. Os
+tipos aceitos sao `A`, `AAAA`, `MX`, `TXT` e `CNAME`; o tipo padrao e `A`.
+
+- Interface web: `GET /tools/dns?domain=example.com&record_type=A`
+- API JSON: `GET /api/dns?domain=example.com&record_type=A`
+- Cada registro retorna `value` e `ttl` em segundos.
+- A API diferencia dominio inexistente, registro inexistente, timeout e falha do
+  resolver por `status` e codigo HTTP.
+- Nomes especiais/internos e tipos nao suportados sao rejeitados.
+
+Exemplo de resposta de sucesso (valores ilustrativos):
+
+```json
+{
+  "domain": "example.com",
+  "record_type": "A",
+  "status": "ok",
+  "records": [
+    {
+      "value": "203.0.113.10",
+      "ttl": 300
+    }
+  ],
+  "error": null,
+  "truncated": false
+}
+```
