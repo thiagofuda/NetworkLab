@@ -25,7 +25,12 @@ def get_request_ip_information(request: Request) -> IpInformation:
     )
 
 
-@router.get("/tools/ip", response_class=HTMLResponse, status_code=status.HTTP_200_OK)
+@router.get(
+    "/tools/ip",
+    response_class=HTMLResponse,
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False,
+)
 async def show_ip_information(request: Request) -> HTMLResponse:
     ip_information = get_request_ip_information(request)
     return templates.TemplateResponse(

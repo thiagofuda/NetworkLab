@@ -22,7 +22,7 @@ HTTP_STATUS_BY_DNS_STATUS = {
 }
 
 
-@router.get("/tools/dns", response_class=HTMLResponse)
+@router.get("/tools/dns", response_class=HTMLResponse, include_in_schema=False)
 async def show_dns_lookup(
     request: Request,
     domain: str | None = None,

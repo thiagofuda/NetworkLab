@@ -11,7 +11,12 @@ templates = Jinja2Templates(directory=templates_directory)
 ROBOTS_TEXT = "User-agent: *\nAllow: /\n"
 
 
-@router.get("/", response_class=HTMLResponse, status_code=status.HTTP_200_OK)
+@router.get(
+    "/",
+    response_class=HTMLResponse,
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False,
+)
 async def show_home(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request=request,
@@ -20,7 +25,12 @@ async def show_home(request: Request) -> HTMLResponse:
     )
 
 
-@router.get("/about", response_class=HTMLResponse, status_code=status.HTTP_200_OK)
+@router.get(
+    "/about",
+    response_class=HTMLResponse,
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False,
+)
 async def show_about(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request=request,
@@ -29,6 +39,6 @@ async def show_about(request: Request) -> HTMLResponse:
     )
 
 
-@router.get("/robots.txt", response_class=PlainTextResponse)
+@router.get("/robots.txt", response_class=PlainTextResponse, include_in_schema=False)
 async def read_robots_file() -> PlainTextResponse:
     return PlainTextResponse(ROBOTS_TEXT)

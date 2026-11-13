@@ -25,3 +25,18 @@ def test_openapi_uses_infralab_identity(monkeypatch) -> None:
     assert response.status_code == 200
     assert api_info["title"] == "InfraLab"
     assert "infrastructure troubleshooting" in api_info["description"]
+
+    documented_paths = response.json()["paths"]
+    hidden_paths = {
+        "/",
+        "/about",
+        "/robots.txt",
+        "/health",
+        "/tools/ip",
+        "/tools/cidr",
+        "/tools/dns",
+    }
+    api_paths = {"/api/ip", "/api/cidr", "/api/dns"}
+
+    assert hidden_paths.isdisjoint(documented_paths)
+    assert api_paths.issubset(documented_paths)
