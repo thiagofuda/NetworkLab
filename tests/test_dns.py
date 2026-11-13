@@ -105,6 +105,7 @@ def test_dns_page_shows_form_without_query(monkeypatch: pytest.MonkeyPatch) -> N
     response = client.get("/tools/dns")
 
     assert response.status_code == 200
+    assert "DNS Lookup | InfraLab" in response.text
     assert "DNS Lookup" in response.text
     assert 'name="domain"' in response.text
     assert "DNS lookup results" not in response.text
