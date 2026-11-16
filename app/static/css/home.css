@@ -96,6 +96,13 @@
   margin: 0 0 8px;
 }
 
+.landing-page .curl-example {
+  margin: 0 8px 12px;
+  color: #5c6863;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
 .landing-page .about-content {
   max-width: 680px;
 }
@@ -141,8 +148,12 @@
 }
 
 .landing-page .tool-copy {
-  display: grid;
-  gap: 3px;
+  display: block;
+}
+
+.landing-page .tool-copy strong::after {
+  content: " - ";
+  white-space: pre;
 }
 
 .landing-page .tool-copy span {

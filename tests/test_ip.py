@@ -1,5 +1,4 @@
-from datetime import datetime
-
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -25,20 +24,23 @@ def test_ip_page_displays_request_information() -> None:
     assert "x-test-header" not in response.text
 
 
-def test_ip_api_returns_request_information_as_json() -> None:
-    # Valida o contrato JSON consumivel por clientes externos.
-    response = client.get(
-        "/api/ip",
-        headers={"User-Agent": "NetworkLab Test", "Accept-Language": "en-US"},
-    )
-
-    response_data = response.json()
+@pytest.mark.parametrize("ip_address", ["203.0.113.10", "2001:db8::1"])
+def test_ip_api_returns_only_client_ip_as_plain_text(ip_address: str) -> None:
+    ip_client = TestClient(app, client=(ip_address, 12345))
+    response = ip_client.get("/api/ip")
 
     assert response.status_code == 200
-    assert response_data["ip_address"] == "testclient"
-    assert response_data["user_agent"] == "NetworkLab Test"
-    assert response_data["headers"]["accept-language"] == "en-US"
-    assert datetime.fromisoformat(response_data["requested_at"]).tzinfo is not None
+    assert response.headers["content-type"].startswith("text/plain")
+    assert response.text == ip_address
+
+
+def test_ip_api_openapi_documents_plain_text() -> None:
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    content = response.json()["paths"]["/api/ip"]["get"]["responses"]["200"]["content"]
+    assert "text/plain" in content
+    assert "application/json" not in content
 
 
 def test_ip_page_escapes_header_html() -> None:
@@ -53,10 +55,10 @@ def test_ip_page_escapes_header_html() -> None:
     assert "&lt;script&gt;" in response.text
 
 
-def test_ip_api_only_exposes_allowlisted_headers() -> None:
+def test_ip_page_only_exposes_allowlisted_headers() -> None:
     # Garante que headers de autenticacao e headers customizados nao sao publicados.
     response = client.get(
-        "/api/ip",
+        "/tools/ip",
         headers={
             "Authorization": "Bearer secret-token",
             "Cookie": "session=secret-value",
@@ -66,12 +68,11 @@ def test_ip_api_only_exposes_allowlisted_headers() -> None:
     )
 
     assert response.status_code == 200
-    response_headers = response.json()["headers"]
-
-    assert response_headers["accept"] == "text/html"
-    assert "authorization" not in response_headers
-    assert "cookie" not in response_headers
-    assert "x-auth-token" not in response_headers
+    assert "accept" in response.text
+    assert "text/html" in response.text
+    assert "authorization" not in response.text
+    assert "cookie" not in response.text
+    assert "x-auth-token" not in response.text
     assert "secret-token" not in response.text
     assert "secret-value" not in response.text
     assert "custom-secret" not in response.text
