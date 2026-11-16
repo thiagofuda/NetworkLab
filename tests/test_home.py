@@ -29,8 +29,17 @@ def test_home_page_displays_landing_content_and_real_tool_links() -> None:
     assert 'class="tool-item" href="/tools/ip"' in response.text
     assert 'class="tool-item" href="/tools/cidr"' in response.text
     assert 'class="tool-item" href="/tools/dns"' in response.text
+    assert "curl https://xdb.com.br/api/ip" in response.text
+    assert "curl 'https://xdb.com.br/api/cidr?cidr=192.168.10.25/24'" in response.text
+    assert (
+        "curl 'https://xdb.com.br/api/dns?domain=example.com&amp;record_type=A'"
+        in response.text
+    )
+    assert "AWS IAM Policy Validator" in response.text
+    assert "https://xdb.com.br/api/aws/iam-validate" in response.text
+    assert "--data-binary @policy.json" in response.text
     assert "SSL/TLS Checker" in response.text
-    assert "Coming soon" in response.text
+    assert '<span class="coming-soon">Em breve</span>' in response.text
     assert "Built with" not in response.text
     assert "<footer" not in response.text
     assert "/tools/ssl" not in response.text

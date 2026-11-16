@@ -96,6 +96,56 @@ Example response (illustrative values):
 }
 ```
 
+### AWS IAM Policy Validator
+
+API para verificar a sintaxe JSON e regras estruturais de policies de identidade
+do IAM. Não utiliza credenciais, não chama a AWS e não altera a policy enviada.
+
+- Endpoint: `POST /api/aws/iam-validate`, com corpo UTF-8 `text/plain`.
+- Envie somente policies que você esteja autorizado a compartilhar. Mesmo sem
+  armazenamento intencional pela aplicação, os dados trafegam até o servidor e
+  podem passar por proxies ou infraestrutura de terceiros.
+- `valid: true` significa apenas que as verificações implementadas passaram. Não
+  garante aceitação pela AWS, avaliação completa das permissões ou segurança.
+- Limites: 32 KiB por requisição, profundidade JSON de 20, 100 statements e 50
+  erros e avisos combinados. `truncated` indica diagnósticos omitidos; uma policy
+  inválida continua com `valid: false`.
+- A análise concluída retorna `200`, inclusive para JSON ou estrutura inválidos.
+  Corpo ausente ou UTF-8 inválido retorna `400`, corpo excessivo retorna `413`
+  e tipo de conteúdo não suportado retorna `415`. Um proxy configurado com
+  limitação de requisições pode retornar `429`.
+
+Exemplo válido, usando um arquivo local `policy.json`:
+
+```json
+{"Version":"2012-10-17","Statement":{"Effect":"Allow","Action":"s3:GetObject","Resource":"*"}}
+```
+
+```bash
+curl -X POST 'https://xdb.com.br/api/aws/iam-validate' \
+  -H 'Content-Type: text/plain' --data-binary @policy.json
+```
+
+Resposta:
+
+```json
+{"valid":true,"errors":[],"warnings":[],"truncated":false}
+```
+
+Para testar localmente JSON inválido e estrutura inválida, respectivamente:
+
+```bash
+curl -X POST 'http://127.0.0.1:8000/api/aws/iam-validate' \
+  -H 'Content-Type: text/plain' --data-binary '{"Statement":'
+curl -X POST 'http://127.0.0.1:8000/api/aws/iam-validate' \
+  -H 'Content-Type: text/plain' --data-binary '{"Statement":{"Effect":"Allow"}}'
+```
+
+Os objetos em `errors` e `warnings` incluem um `code` estável e uma mensagem;
+posição, campo e sugestão são fornecidos quando disponíveis. A validação não
+consulta o catálogo de ações ou recursos da AWS e não avalia o significado
+específico de operadores e chaves em `Condition`.
+
 ## Technologies
 
 - Python 3.11+

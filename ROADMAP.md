@@ -28,3 +28,8 @@
 # Sprint 6
 
 - [x] DNS Lookup
+
+# Sprint 8
+
+- [x] Validação de sintaxe e estrutura de policies de identidade AWS IAM via API
+- [x] Limites de entrada e diagnósticos, testes e documentação
