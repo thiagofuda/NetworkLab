@@ -10,6 +10,7 @@ from app.routers.dns import router as dns_router
 from app.routers.home import router as home_router
 from app.routers.iam_policy import router as iam_policy_router
 from app.routers.ip import router as ip_router
+from app.routers.terraform_plan import router as terraform_plan_router
 
 
 def create_app() -> FastAPI:
@@ -35,6 +36,7 @@ def create_app() -> FastAPI:
     application.include_router(cidr_router)
     application.include_router(dns_router)
     application.include_router(iam_policy_router)
+    application.include_router(terraform_plan_router)
     application.include_router(api_router)
     application.include_router(ip_router)
     return application
