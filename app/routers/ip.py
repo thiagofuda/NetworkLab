@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fastapi import APIRouter, Request, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
 
 from app.schemas.ip import IpInformation
@@ -42,9 +42,9 @@ async def show_ip_information(request: Request) -> HTMLResponse:
 
 @router.get(
     "/api/ip",
-    response_model=IpInformation,
+    response_class=PlainTextResponse,
     status_code=status.HTTP_200_OK,
 )
-async def read_ip_information(request: Request) -> IpInformation:
-    return get_request_ip_information(request)
+async def read_ip_information(request: Request) -> PlainTextResponse:
+    return PlainTextResponse(get_request_ip_information(request).ip_address)
 
