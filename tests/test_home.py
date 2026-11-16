@@ -17,6 +17,12 @@ def test_home_page_displays_landing_content_and_real_tool_links() -> None:
     )
     assert "https://github.com/thiagofuda/NetworkLab" in response.text
     assert "https://github.com/thiagofuda/homeLab" in response.text
+    assert "curl https://xdb.com.br/api/ip" in response.text
+    assert "curl 'https://xdb.com.br/api/cidr?cidr=192.168.10.25/24'" in response.text
+    assert (
+        "curl 'https://xdb.com.br/api/dns?domain=example.com&amp;record_type=A'"
+        in response.text
+    )
     assert 'class="brand-name" href="/">InfraLab</a>' in response.text
     assert "InfraLab GitHub" in response.text
     assert 'class="author-link" href="/about">Thiago Fuda</a>' in response.text

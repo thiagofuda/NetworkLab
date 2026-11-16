@@ -22,24 +22,17 @@ The application is available at [xdb.com.br](https://xdb.com.br).
 
 ### IP Information
 
-Shows the client IP observed by the service, User-Agent, selected request
-headers, and request time.
+Shows the client IP observed by the service. The web page also displays the
+User-Agent, selected request headers, and request time.
 
 - HTML: `GET /tools/ip`
-- JSON: `GET /api/ip`
+- Plain text: `GET /api/ip`
 
-Example response:
+Example request and response (the IP address is illustrative):
 
-```json
-{
-  "ip_address": "203.0.113.10",
-  "user_agent": "curl/8.0.0",
-  "headers": {
-    "accept": "*/*",
-    "host": "xdb.com.br"
-  },
-  "requested_at": "2026-11-13T12:00:00+00:00"
-}
+```text
+$ curl https://xdb.com.br/api/ip
+203.0.113.10
 ```
 
 ### CIDR Calculator
