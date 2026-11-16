@@ -39,7 +39,7 @@ def test_home_page_displays_landing_content_and_real_tool_links() -> None:
     assert "https://xdb.com.br/api/aws/iam-validate" in response.text
     assert "--data-binary @policy.json" in response.text
     assert "SSL/TLS Checker" in response.text
-    assert "Coming soon" in response.text
+    assert '<span class="coming-soon">Em breve</span>' in response.text
     assert "Built with" not in response.text
     assert "<footer" not in response.text
     assert "/tools/ssl" not in response.text
