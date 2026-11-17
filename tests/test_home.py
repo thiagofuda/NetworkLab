@@ -43,6 +43,9 @@ def test_home_page_displays_landing_content_and_real_tool_links() -> None:
     assert "https://xdb.com.br/api/aws/terraform-plan-analyze" in response.text
     assert "https://xdb.com.br/api/oci/terraform-plan-analyze" in response.text
     assert "--data-binary @plan.json" in response.text
+    assert "OCI IAM Policy Analyzer" in response.text
+    assert "https://xdb.com.br/api/oci/iam-policy-analyze" in response.text
+    assert "--data-binary @oci-policy.json" in response.text
     assert "SSL/TLS Checker" in response.text
     assert '<span class="coming-soon">Em breve</span>' in response.text
     assert "Built with" not in response.text

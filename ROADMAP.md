@@ -39,3 +39,9 @@
 - [x] Análise de Terraform Plan JSON por rotas AWS e OCI
 - [x] Resumo de ações, recursos afetados e findings AWS/OCI
 - [x] Limites, sanitização, testes e documentação
+
+# Sprint 10
+
+- [x] Análise de statements OCI IAM com Gemini
+- [x] Duplicações determinísticas, findings candidatos e revisão humana
+- [x] Limites, privacidade, testes mockados e documentação
