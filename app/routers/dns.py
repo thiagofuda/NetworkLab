@@ -23,7 +23,8 @@ HTTP_STATUS_BY_DNS_STATUS = {
 
 
 @router.get("/tools/dns", response_class=HTMLResponse, include_in_schema=False)
-async def show_dns_lookup(
+# O resolvedor é síncrono. O FastAPI executa handlers def no pool de threads.
+def show_dns_lookup(
     request: Request,
     domain: str | None = None,
     record_type: str = "A",
@@ -43,7 +44,7 @@ async def show_dns_lookup(
 
 
 @router.get("/api/dns", response_model=DnsLookupResponse)
-async def read_dns_lookup(
+def read_dns_lookup(
     response: Response,
     domain: str | None = None,
     record_type: str = "A",

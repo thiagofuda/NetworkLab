@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.routers.oci_iam_policy import MAX_BODY_SIZE
+from app.routers.oci_iam_policy import MAX_BODY_SIZE, MAX_JSON_DEPTH
 from app.schemas.oci_iam_policy import GeminiPolicyAnalysis, GeminiPolicyFinding
 from app.services.gemini_service import (
     GeminiAuthenticationError,
@@ -145,6 +145,14 @@ def test_invalid_or_injected_statement_is_not_echoed(
     ("body", "status_code", "error_code"),
     [
         ('{"statements":', 400, "INVALID_JSON"),
+        ('{"statements":[],"statements":[]}', 400, "INVALID_JSON"),
+        ('{"statements":[{"key":1,"key":2}]}', 400, "INVALID_JSON"),
+        ('{"statements":[NaN]}', 400, "INVALID_JSON"),
+        ("[" * (MAX_JSON_DEPTH + 1) + "]" * (MAX_JSON_DEPTH + 1), 400, "INVALID_JSON"),
+        ("[" * 2000 + "]" * 2000, 400, "INVALID_JSON"),
+        ("[" + "9" * 5000 + "]", 400, "INVALID_JSON"),
+        ('{"statements":["\\ud800"]}', 422, "INVALID_STATEMENTS"),
+        ("[]", 422, "INVALID_STATEMENTS"),
         (json.dumps({"statements": []}), 422, "INVALID_STATEMENTS"),
         (json.dumps({"statements": [""]}), 422, "INVALID_STATEMENTS"),
         (
@@ -160,7 +168,7 @@ def test_invalid_or_injected_statement_is_not_echoed(
         (json.dumps({"statements": ["A" * 2049]}), 422, "INVALID_STATEMENTS"),
     ],
 )
-def test_invalid_policy_inputs_return_structured_422(
+def test_invalid_policy_inputs_return_structured_error(
     body: str,
     status_code: int,
     error_code: str,
@@ -171,6 +179,14 @@ def test_invalid_policy_inputs_return_structured_422(
     assert response.status_code == status_code
     assert response.json()["detail"]["code"] == error_code
     assert fake_analyzer.statements == []
+
+
+def test_multibyte_statement_is_accepted(fake_analyzer: FakeAnalyzer) -> None:
+    statement = "Allow group Operação to inspect instances in tenancy"
+    response = post_statements([statement])
+
+    assert response.status_code == 200
+    assert fake_analyzer.statements == [(0, statement)]
 
 
 def test_total_text_and_body_limits(fake_analyzer: FakeAnalyzer) -> None:

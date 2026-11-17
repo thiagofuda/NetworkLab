@@ -1,5 +1,6 @@
 import json
 from email.message import Message
+from typing import NoReturn
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import ValidationError
@@ -18,6 +19,7 @@ from app.services.oci_iam_policy_service import (
 
 router = APIRouter()
 MAX_BODY_SIZE = 32 * 1024
+MAX_JSON_DEPTH = 20
 # Mantem os erros esperados visiveis no contrato OpenAPI.
 ERROR_RESPONSES = {
     400: {
@@ -63,6 +65,29 @@ def _http_error(status_code: int, code: str, message: str) -> HTTPException:
         status_code=status_code,
         detail={"code": code, "message": message},
     )
+
+
+def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result = dict(pairs)
+    if len(result) != len(pairs):
+        raise ValueError("Duplicate JSON key.")
+    return result
+
+
+def _reject_json_constant(_value: str) -> NoReturn:
+    raise ValueError("Non-standard JSON constant.")
+
+
+def _validate_json_depth(payload: object) -> None:
+    # Conta apenas objetos e listas, sem interpretar delimitadores em strings.
+    pending = [(payload, 1)]
+    while pending:
+        value, depth = pending.pop()
+        if isinstance(value, (dict, list)):
+            if depth > MAX_JSON_DEPTH:
+                raise ValueError("JSON nesting limit exceeded.")
+            children = value.values() if isinstance(value, dict) else value
+            pending.extend((child, depth + 1) for child in children)
 
 
 def _validate_headers(request: Request) -> None:
@@ -143,8 +168,13 @@ async def _read_request(request: Request) -> OciPolicyAnalysisRequest:
             400, "INVALID_UTF8", "The request body must be valid UTF-8."
         ) from error
     try:
-        payload = json.loads(text)
-    except json.JSONDecodeError as error:
+        payload = json.loads(
+            text,
+            object_pairs_hook=_reject_duplicate_keys,
+            parse_constant=_reject_json_constant,
+        )
+        _validate_json_depth(payload)
+    except (ValueError, RecursionError) as error:
         raise _http_error(
             400, "INVALID_JSON", "The request body must be valid JSON."
         ) from error
@@ -193,7 +223,7 @@ async def analyze_oci_iam_policy_request(
     except PolicyInputError as error:
         raise _http_error(422, "INVALID_STATEMENTS", str(error)) from error
     except GeminiServiceError as error:
-        # So expomos identificadores controlados; mensagens brutas ficam nos logs.
+        # A resposta usa mensagens públicas e metadados controlados.
         detail = {
             "code": error.code,
             "message": error.public_message,

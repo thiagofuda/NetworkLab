@@ -1,7 +1,10 @@
+import asyncio
+from threading import Event
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import dns.resolver
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -52,6 +55,44 @@ def test_dns_api_returns_records_and_ttl(monkeypatch: pytest.MonkeyPatch) -> Non
         "error": None,
         "truncated": False,
     }
+
+
+@pytest.mark.parametrize("path", ["/api/dns", "/tools/dns"])
+def test_health_responds_while_dns_resolver_waits(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    resolver = mock_resolver(monkeypatch)
+    answer = resolver.resolve.return_value
+    released = Event()
+
+    async def check_concurrency() -> None:
+        loop = asyncio.get_running_loop()
+        started = asyncio.Event()
+
+        def wait_for_release(*args: object, **kwargs: object) -> object:
+            loop.call_soon_threadsafe(started.set)
+            assert released.wait(timeout=2), "Health did not respond during DNS lookup"
+            return answer
+
+        resolver.resolve.side_effect = wait_for_release
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as async_client:
+            lookup = asyncio.create_task(
+                async_client.get(path, params={"domain": "example.com"})
+            )
+            try:
+                await asyncio.wait_for(started.wait(), timeout=2)
+                response = await async_client.get("/health")
+                assert response.status_code == 200
+                assert not lookup.done()
+            finally:
+                released.set()
+                lookup_response = await lookup
+            assert lookup_response.status_code == 200
+
+    asyncio.run(check_concurrency())
 
 
 @pytest.mark.parametrize(
