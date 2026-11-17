@@ -38,6 +38,11 @@ def test_home_page_displays_landing_content_and_real_tool_links() -> None:
     assert "AWS IAM Policy Validator" in response.text
     assert "https://xdb.com.br/api/aws/iam-validate" in response.text
     assert "--data-binary @policy.json" in response.text
+    assert "AWS Terraform Plan Inspector" in response.text
+    assert "OCI Terraform Plan Inspector" in response.text
+    assert "https://xdb.com.br/api/aws/terraform-plan-analyze" in response.text
+    assert "https://xdb.com.br/api/oci/terraform-plan-analyze" in response.text
+    assert "--data-binary @plan.json" in response.text
     assert "SSL/TLS Checker" in response.text
     assert '<span class="coming-soon">Em breve</span>' in response.text
     assert "Built with" not in response.text
@@ -72,7 +77,8 @@ def test_about_page_shows_profile_and_links() -> None:
     assert "Linux, cloud, automation, and infrastructure." in response.text
     assert "personal, open-source project" in response.text
     assert 'href="https://github.com/thiagofuda"' in response.text
-    assert "LinkedIn - coming soon" in response.text
+    assert 'href="https://br.linkedin.com/in/thiago-fuda"' in response.text
+    assert "LinkedIn" in response.text
     assert 'class="back-link" href="/">Back to home</a>' in response.text
     assert "About | InfraLab" in response.text
     assert "NetworkLab is a personal" not in response.text

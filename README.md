@@ -146,6 +146,66 @@ posição, campo e sugestão são fornecidos quando disponíveis. A validação 
 consulta o catálogo de ações ou recursos da AWS e não avalia o significado
 específico de operadores e chaves em `Condition`.
 
+### Terraform Plan Inspector
+
+Analisa o JSON criado por `terraform show -json` sem executar Terraform, acessar
+provedores ou armazenar o plano. AWS e OCI usam o mesmo analisador, com rotas
+separadas:
+
+- AWS: `POST /api/aws/terraform-plan-analyze`
+- OCI: `POST /api/oci/terraform-plan-analyze`
+- Envie o arquivo local diretamente como `application/json`; multipart não é
+  suportado.
+
+**Não envie planos corporativos reais nem informações confidenciais à API
+pública.** Planos podem conter valores sensíveis em texto claro. A aplicação não
+registra intencionalmente nem armazena o payload e não o envia a serviços
+externos, mas o corpo trafega pelo servidor e pela infraestrutura de rede.
+
+Exemplo para AWS:
+
+```bash
+curl -X POST 'https://xdb.com.br/api/aws/terraform-plan-analyze' \
+  -H 'Content-Type: application/json' --data-binary @plan.json
+```
+
+Exemplo para OCI:
+
+```bash
+curl -X POST 'https://xdb.com.br/api/oci/terraform-plan-analyze' \
+  -H 'Content-Type: application/json' --data-binary @plan.json
+```
+
+A resposta de análise inclui `valid`, provider identificado, contagem das seis
+ações, recursos e findings. Cada recurso tem `resource_index` (índice começando
+em zero no array `resource_changes`), para distinguir endereços após a
+sanitização de chaves string de `for_each`. A resposta nunca inclui objetos
+`before` ou `after`. Finding confirmado tem `status: "confirmed"`; verificações
+de SSH sem dados suficientes ou com atributos relevantes desconhecidos/sensíveis
+retornam `status: "inconclusive"` e severidade `warning`.
+
+As duas ações de replace contam uma vez como `replace`, não como create e delete.
+Exclusões e replacements geram findings genéricos; na rota AWS, exclusões ou
+replacements de `aws_db_instance` e `aws_rds_cluster` geram `RDS_DELETION`, e
+regras de Security Group com TCP/22 público geram `PUBLIC_SSH_ACCESS`. A rota OCI
+retorna somente findings genéricos.
+
+Limites: corpo de 1 MiB, profundidade JSON de 40, 500 entradas em
+`resource_changes` e 100 findings. Se findings excederem o limite, `truncated`
+será `true`; trate essa resposta como incompleta. Planos AWS + OCI são rejeitados
+com `MIXED_CLOUD_PROVIDERS`; planos sem metadados suficientes retornam
+`PROVIDER_UNIDENTIFIED`. Erros usam `{"detail":{"code":"...","message":"..."}}`
+com códigos estáveis, incluindo `INVALID_JSON`, `NOT_TERRAFORM_PLAN`,
+`UNSUPPORTED_FORMAT_VERSION`, `PROVIDER_MISMATCH`, `RESOURCE_LIMIT_EXCEEDED` e
+`PAYLOAD_TOO_LARGE`. JSON inválido retorna `400`; documento não aceito retorna
+`422`; tipo de conteúdo não suportado retorna `415`; corpo acima do limite retorna
+`413`; rate limiting do proxy retorna `429`.
+
+`valid: true` significa apenas que o documento foi reconhecido e analisado; não
+significa que Terraform ou um provider aceitará o plano, nem que as mudanças são
+seguras. Outputs e drift não são analisados. A verificação de SSH cobre apenas
+formatos conhecidos de regras de Security Group AWS e não é um scanner completo.
+
 ## Technologies
 
 - Python 3.11+

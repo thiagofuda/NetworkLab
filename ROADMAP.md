@@ -33,3 +33,9 @@
 
 - [x] Validação de sintaxe e estrutura de policies de identidade AWS IAM via API
 - [x] Limites de entrada e diagnósticos, testes e documentação
+
+# Sprint 9
+
+- [x] Análise de Terraform Plan JSON por rotas AWS e OCI
+- [x] Resumo de ações, recursos afetados e findings AWS/OCI
+- [x] Limites, sanitização, testes e documentação
