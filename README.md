@@ -206,6 +206,116 @@ significa que Terraform ou um provider aceitará o plano, nem que as mudanças s
 seguras. Outputs e drift não são analisados. A verificação de SSH cobre apenas
 formatos conhecidos de regras de Security Group AWS e não é um scanner completo.
 
+### OCI IAM Policy Analyzer
+
+Analisa uma lista de statements OCI IAM em `POST /api/oci/iam-policy-analyze`.
+O corpo deve ser `application/json` no formato `{"statements":["..."]}`; não
+envie um objeto completo de policy da OCI e não é necessário usar multipart.
+O serviço não consulta uma tenancy OCI e não usa credenciais OCI.
+
+**Esta ferramenta envia os statements ao Google Gemini usando o Free Tier.**
+Segundo os termos atuais dos serviços não pagos do Google, o conteúdo enviado e
+as respostas podem ser usados para melhorar produtos e podem ser lidos por
+revisores humanos. **Não envie policies corporativas confidenciais, dados
+pessoais ou informações que você não esteja autorizado a compartilhar.** O
+InfraLab não armazena nem registra intencionalmente os statements, mas eles são
+transmitidos ao Google para análise.
+
+Exemplo de entrada com 10 statements:
+
+```json
+{
+  "statements": [
+    "Allow group Developers to inspect instances in compartment DEV",
+    "Allow group Developers to read instances in compartment DEV",
+    "Allow group Developers to manage instances in compartment DEV",
+    "Allow group QA to inspect instances in compartment DEV",
+    "Allow group Developers to read instances in compartment QA",
+    "Allow group Production/Developers to read instances in compartment DEV",
+    "Allow group Developers to use instances in compartment DEV where request.region='IAD'",
+    "Allow group Developers to use instances in compartment DEV where request.region='GRU'",
+    "Allow group Developers to manage all-resources in tenancy",
+    "Allow group Developers to inspect instances in compartment DEV"
+  ]
+}
+```
+
+```bash
+curl -X POST 'https://xdb.com.br/api/oci/iam-policy-analyze' \
+  -H 'Content-Type: application/json' --data-binary @oci-policy.json
+```
+
+A análise retorna `status` como `completed` ou `inconclusive`. Duplicações
+equivalentes após normalizar espaços fora de valores são confirmadas pelo Python.
+Redundâncias e permissões amplas sugeridas pelo Gemini são sempre candidatas para
+revisão humana, com `review_only: true`; não há policy corrigida pronta para
+aplicação. As sugestões apontam somente para índices originais e as condições
+`suggested_keep_indexes` identifica statements originais a manter em consideração;
+não são instruções para excluir statements. As condições `where`, principal/domínio,
+resource type e location precisam coincidir para uma redundância permanecer
+candidata. Comparações não verificadas ficam inconclusivas. Resource-family
+equivalence não é analisada. Se o Gemini retornar índices inválidos ou JSON
+incompatível, a resposta será inconclusiva.
+
+Limites locais: corpo de 32 KiB, até 50 statements, 2.048 caracteres por
+statement, 16 KiB somados, 12.000 tokens de entrada e 2.048 tokens de saída. O
+modelo padrão é `gemini-3.5-flash-lite`; `GEMINI_MODEL` permite substituí-lo. Não há
+fallback automático para modelos pagos. Quota excedida retorna `429`; chave
+ausente, credenciais sem acesso ou modelo indisponível retornam `503`; request
+rejeitado pelo Gemini retorna `502` (`GEMINI_REQUEST_REJECTED` ou
+`GEMINI_SCHEMA_REJECTED`); timeout total de 20 segundos retorna `504`.
+Falha de conexão com o Gemini retorna `503` (`GEMINI_CONNECTION_FAILED`).
+JSON malformado retorna `400`, entrada/schema inválidos `422`, tipo de conteúdo
+não suportado `415`, e corpo ou tokens acima do limite `413`.
+Erros usam `{"detail":{"code":"...","message":"..."}}`.
+
+`completed` indica que o serviço recebeu uma resposta Gemini válida, não que os
+statements sejam equivalentes ou seguros. `inconclusive` indica que a comparação
+não pôde ser validada com segurança. Uma lista `findings` vazia significa apenas
+que não houve findings nesta análise, não que a policy foi aprovada.
+
+Para desenvolvimento local, copie `.env.example` para `.env`, restrinja o acesso
+ao arquivo com `chmod 600 .env` e preencha `GEMINI_API_KEY` localmente. O arquivo
+`.env` é ignorado pelo Git; nunca coloque a chave no código, em exemplos ou no
+Compose versionado. A integração não registra statements ou mensagens de erro
+do provedor nos logs.
+
+Exemplo ilustrativo de resposta (as conclusões do Gemini podem variar):
+
+```json
+{
+  "status": "completed",
+  "findings": [
+    {
+      "code": "POTENTIAL_REDUNDANCY",
+      "source": "gemini",
+      "assessment": "candidate",
+      "severity": "warning",
+      "statement_indexes": [0, 1, 2],
+      "message": "Review these statements together.",
+      "explanation": "The verbs are ordered generally, but this is not proof of equivalence for every resource type.",
+      "suggested_keep_indexes": [2],
+      "review_only": true
+    },
+    {
+      "code": "EXACT_DUPLICATE",
+      "source": "python",
+      "assessment": "confirmed",
+      "severity": "warning",
+      "statement_indexes": [0, 9],
+      "message": "These statements are identical after safe whitespace normalization.",
+      "explanation": "Only whitespace outside quoted values was normalized.",
+      "suggested_keep_indexes": [0],
+      "review_only": true
+    }
+  ],
+  "analysis_limitations": [
+    "TENANCY_NOT_QUERIED",
+    "RESOURCE_FAMILY_EQUIVALENCE_NOT_EVALUATED"
+  ]
+}
+```
+
 ## Technologies
 
 - Python 3.11+

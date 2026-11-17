@@ -10,10 +10,13 @@ from app.routers.dns import router as dns_router
 from app.routers.home import router as home_router
 from app.routers.iam_policy import router as iam_policy_router
 from app.routers.ip import router as ip_router
+from app.routers.oci_iam_policy import router as oci_iam_policy_router
 from app.routers.terraform_plan import router as terraform_plan_router
+from app.services.gemini_service import GeminiPolicyAnalyzer
 
 
 def create_app() -> FastAPI:
+    """Monta a aplicacao, seus servicos compartilhados e routers."""
     # Centraliza a criação da aplicação para facilitar testes e futura evolução.
     settings = get_settings()
     application = FastAPI(
@@ -25,6 +28,8 @@ def create_app() -> FastAPI:
         debug=settings.app_debug,
         version="0.1.0",
     )
+    # O router recebe o servico pelo estado da aplicacao; os testes podem substitui-lo.
+    application.state.oci_iam_policy_analyzer = GeminiPolicyAnalyzer(settings)
     static_directory = Path(__file__).parent / "static"
     application.mount(
         "/static",
@@ -36,6 +41,7 @@ def create_app() -> FastAPI:
     application.include_router(cidr_router)
     application.include_router(dns_router)
     application.include_router(iam_policy_router)
+    application.include_router(oci_iam_policy_router)
     application.include_router(terraform_plan_router)
     application.include_router(api_router)
     application.include_router(ip_router)
