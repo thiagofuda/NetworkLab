@@ -56,12 +56,15 @@ def parse_policy(text: str) -> tuple[dict[str, Any] | None, PolicyIssue | None]:
     if not text.strip():
         return None, PolicyIssue(code="EMPTY_DOCUMENT", message="The policy is empty.")
 
+    # Limita o aninhamento antes que o json.loads percorra o documento.
     if _exceeds_max_depth(text):
         return None, PolicyIssue(
             code="MAX_DEPTH_EXCEEDED",
             message="The policy exceeds the maximum JSON depth of 20.",
         )
 
+    # Duas chaves iguais deixariam o ultimo valor esconder o primeiro.
+    # Decimal preserva valores fracionarios de Condition sem arredondar como float.
     try:
         policy = json.loads(
             text,
@@ -339,6 +342,7 @@ def _check_statement(
 
 
 def validate_iam_policy(text: str) -> PolicyValidationResult:
+    """Verifica a estrutura de uma policy de identidade sem calcular acesso efetivo."""
     policy, parse_error = parse_policy(text)
     if parse_error is not None:
         return PolicyValidationResult(valid=False, errors=[parse_error], warnings=[])

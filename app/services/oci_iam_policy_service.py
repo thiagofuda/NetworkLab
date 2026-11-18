@@ -8,8 +8,7 @@ from app.schemas.oci_iam_policy import (
     OciPolicyFinding,
 )
 
-# Este parser reconhece apenas o formato Allow usado pelo analisador; ele nao
-# substitui o parser oficial da linguagem OCI IAM.
+# O reconhecimento do formato Allow serve apenas para comparar escopos.
 MAX_STATEMENT_BYTES = 16 * 1024
 POLICY_STATEMENT_PATTERN = re.compile(
     r"^Allow\s+(?P<subject>.+?)\s+to\s+"
@@ -18,8 +17,9 @@ POLICY_STATEMENT_PATTERN = re.compile(
     re.IGNORECASE,
 )
 PATTERN_WITH_WHITESPACE = re.compile(r"/[^/]*\s+[^/]*/")
+BALANCED_QUOTES = re.compile(r"(?:[^']|'(?:[^'\\]|\\.)*')*")
+PolicyScope = tuple[str, str, str, str | None]
 BASE_LIMITATIONS = [
-    # A analise e local: nao consulta a tenancy nem resolve equivalencias OCI.
     "TENANCY_NOT_QUERIED",
     "RESOURCE_FAMILY_EQUIVALENCE_NOT_EVALUATED",
 ]
@@ -28,13 +28,13 @@ BASE_LIMITATIONS = [
 class PolicyInputError(ValueError):
     """Indica que a entrada nao pertence ao subconjunto aceito pelo servico."""
 
-    pass
+
+class PolicyTextError(PolicyInputError):
+    """Indica falha no tamanho ou na codificacao do texto."""
 
 
 class InvalidGeminiResponse(ValueError):
     """Indica que a resposta Gemini nao pode ser usada com seguranca."""
-
-    pass
 
 
 class GeminiPolicyAnalyzer(Protocol):
@@ -44,14 +44,6 @@ class GeminiPolicyAnalyzer(Protocol):
         self,
         indexed_statements: list[tuple[int, str]],
     ) -> GeminiPolicyAnalysis: ...
-
-
-def _validate_statement(statement: str, index: int) -> None:
-    """Rejeita statements fora do formato suportado antes de chamar o Gemini."""
-    if _policy_scope(statement) is None:
-        raise PolicyInputError(
-            f"Statement at index {index} is not a supported OCI Allow statement."
-        )
 
 
 def _split_where(scope: str) -> tuple[str, str | None]:
@@ -84,7 +76,7 @@ def _split_where(scope: str) -> tuple[str, str | None]:
     return scope.strip(), None
 
 
-def _policy_scope(statement: str) -> tuple[str, str, str, str | None] | None:
+def _policy_scope(statement: str) -> PolicyScope | None:
     """Retorna principal, recurso, localizacao e condicao do formato aceito."""
     match = POLICY_STATEMENT_PATTERN.fullmatch(statement)
     if match is None:
@@ -137,12 +129,10 @@ def _normalize_statement(statement: str) -> str:
     return "".join(normalized)
 
 
-def _find_exact_duplicates(statements: list[str]) -> list[OciPolicyFinding]:
-    """Agrupa somente statements iguais apos a normalizacao conservadora."""
-    indexes_by_statement: dict[str, list[int]] = defaultdict(list)
-    for index, statement in enumerate(statements):
-        indexes_by_statement[_normalize_statement(statement)].append(index)
-
+def _find_exact_duplicates(
+    indexes_by_statement: dict[str, list[int]],
+) -> list[OciPolicyFinding]:
+    """Confirma duplicatas de texto e usa a primeira ocorrencia como referencia."""
     findings: list[OciPolicyFinding] = []
     for indexes in indexes_by_statement.values():
         if len(indexes) < 2:
@@ -179,26 +169,25 @@ def _build_inconclusive_result(
 
 def _convert_gemini_findings(
     analysis: GeminiPolicyAnalysis,
-    valid_indexes: set[int],
-    statements_by_index: dict[int, str],
+    scopes_by_index: dict[int, PolicyScope | None],
 ) -> list[OciPolicyFinding]:
     """Valida referencias do Gemini e limita sugestoes a revisao humana."""
     findings: list[OciPolicyFinding] = []
     for finding in analysis.findings:
         indexes = set(finding.statement_indexes)
-        suggestions = set(finding.suggested_keep_indexes)
-        # O modelo externo nao pode criar indices nem sugerir indices fora do grupo.
-        if not indexes.issubset(valid_indexes) or not suggestions.issubset(indexes):
+        # Aceita apenas os indices originais que foram enviados ao modelo.
+        if not indexes.issubset(scopes_by_index) or not set(
+            finding.suggested_keep_indexes
+        ).issubset(indexes):
             raise InvalidGeminiResponse()
 
         assessment = finding.assessment
         message = finding.message
         explanation = finding.explanation
-        suggested_indexes = finding.suggested_keep_indexes
         if finding.code == "POTENTIAL_REDUNDANCY":
-            # Uma diferenca de escopo invalida a comparacao, mesmo se o modelo
-            # afirmar que os statements sao redundantes.
-            scopes = {_policy_scope(statements_by_index[index]) for index in indexes}
+            # Condicoes diferentes podem liberar acesso em casos distintos.
+            # Por isso a sugestao so passa quando os escopos coincidem.
+            scopes = {scopes_by_index[index] for index in indexes}
             if None in scopes or len(scopes) != 1:
                 assessment = "inconclusive"
                 message = "The statements have different or unsupported policy scopes."
@@ -206,14 +195,14 @@ def _convert_gemini_findings(
                     "Principal, resource type, location, or where condition differs; "
                     "no simplification is confirmed."
                 )
-                suggested_indexes = []
         elif finding.code == "CONDITION_REVIEW":
             assessment = "inconclusive"
-            suggested_indexes = []
-        else:
-            suggested_indexes = []
-        if assessment == "inconclusive":
-            suggested_indexes = []
+
+        suggested_indexes = (
+            finding.suggested_keep_indexes
+            if finding.code == "POTENTIAL_REDUNDANCY" and assessment == "candidate"
+            else []
+        )
 
         findings.append(
             OciPolicyFinding(
@@ -236,32 +225,38 @@ async def analyze_oci_iam_policy(
     gemini_analyzer: GeminiPolicyAnalyzer,
 ) -> OciPolicyAnalysisResponse:
     """Combina duplicatas locais com sugestoes Gemini validadas."""
-    for index, statement in enumerate(statements):
-        _validate_statement(statement, index)
-
-    # O limite e medido em bytes UTF-8 para corresponder ao tamanho transmitido.
-    total_bytes = sum(len(statement.encode("utf-8")) for statement in statements)
+    # O schema limita caracteres por item. Aqui contamos bytes UTF-8 do conjunto,
+    # pois um caractere pode ocupar mais de um byte.
+    try:
+        total_bytes = sum(len(statement.encode("utf-8")) for statement in statements)
+    except UnicodeEncodeError as error:
+        raise PolicyTextError("Statements must be valid UTF-8.") from error
     if total_bytes > MAX_STATEMENT_BYTES:
-        raise PolicyInputError("The combined statement text exceeds 16 KiB.")
+        raise PolicyTextError("The combined statement text exceeds 16 KiB.")
 
-    duplicate_findings = _find_exact_duplicates(statements)
-    seen: set[str] = set()
+    indexes_by_statement: dict[str, list[int]] = defaultdict(list)
     indexed_unique_statements: list[tuple[int, str]] = []
-    # Remove duplicatas do prompt, mas conserva o indice original para os findings.
+    scopes_by_index: dict[int, PolicyScope | None] = {}
     for index, statement in enumerate(statements):
-        normalized = _normalize_statement(statement)
-        if normalized in seen:
-            continue
-        seen.add(normalized)
-        indexed_unique_statements.append((index, statement))
+        scope = _policy_scope(statement)
+        if scope is None:
+            raise PolicyInputError(
+                f"Statement at index {index} is not a supported OCI Allow statement."
+            )
+        indexes = indexes_by_statement[_normalize_statement(statement)]
+        if not indexes:
+            # Mantem o indice original para ligar cada finding a entrada.
+            indexed_unique_statements.append((index, statement))
+            # Aspas abertas deixam os limites do escopo incertos.
+            scopes_by_index[index] = (
+                scope if BALANCED_QUOTES.fullmatch(statement) else None
+            )
+        indexes.append(index)
 
+    duplicate_findings = _find_exact_duplicates(indexes_by_statement)
     try:
         gemini_analysis = await gemini_analyzer.analyze(indexed_unique_statements)
-        gemini_findings = _convert_gemini_findings(
-            gemini_analysis,
-            {index for index, _ in indexed_unique_statements},
-            dict(indexed_unique_statements),
-        )
+        gemini_findings = _convert_gemini_findings(gemini_analysis, scopes_by_index)
     except InvalidGeminiResponse:
         # Nao descarta duplicatas locais confirmadas por causa de uma resposta ruim.
         return _build_inconclusive_result(
@@ -271,7 +266,8 @@ async def analyze_oci_iam_policy(
 
     status = (
         "inconclusive"
-        if any(finding.assessment == "inconclusive" for finding in gemini_findings)
+        if None in scopes_by_index.values()
+        or any(finding.assessment == "inconclusive" for finding in gemini_findings)
         else "completed"
     )
     return OciPolicyAnalysisResponse(

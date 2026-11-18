@@ -7,18 +7,7 @@ from pydantic import SecretStr
 from app.core.config import Settings
 from app.schemas.oci_iam_policy import GeminiPolicyAnalysis
 from app.services import gemini_service
-from app.services.gemini_service import (
-    GeminiAuthenticationError,
-    GeminiConnectionFailed,
-    GeminiModelUnavailable,
-    GeminiNotConfigured,
-    GeminiPolicyAnalyzer,
-    GeminiRateLimited,
-    GeminiRequestRejected,
-    GeminiServiceError,
-    GeminiTimeout,
-    GeminiTokenLimitExceeded,
-)
+from app.services.gemini_service import GeminiPolicyAnalyzer, GeminiServiceError
 from app.services.oci_iam_policy_service import InvalidGeminiResponse
 
 # Estes testes usam doubles locais; nenhuma chamada real ao Gemini e feita.
@@ -128,10 +117,12 @@ def test_gemini_uses_configured_model_interactions_and_token_caps() -> None:
 def test_missing_api_key_is_rejected_without_creating_client() -> None:
     analyzer, clients = make_analyzer(FakeModels(), api_key="")
 
-    with pytest.raises(GeminiNotConfigured):
+    with pytest.raises(GeminiServiceError) as error:
         asyncio.run(
             analyzer.analyze([(0, "Allow group Devs to inspect instances in tenancy")])
         )
+
+    assert error.value.code == "GEMINI_NOT_CONFIGURED"
 
     assert clients == []
 
@@ -140,10 +131,12 @@ def test_token_limit_is_checked_before_generation() -> None:
     models = FakeModels(token_count=gemini_service.MAX_INPUT_TOKENS + 1)
     analyzer, _ = make_analyzer(models)
 
-    with pytest.raises(GeminiTokenLimitExceeded):
+    with pytest.raises(GeminiServiceError) as error:
         asyncio.run(
             analyzer.analyze([(0, "Allow group Devs to inspect instances in tenancy")])
         )
+
+    assert error.value.code == "GEMINI_TOKEN_LIMIT_EXCEEDED"
 
     assert models.interaction_arguments == {}
 
@@ -158,21 +151,21 @@ def test_invalid_gemini_json_is_not_accepted() -> None:
 
 
 @pytest.mark.parametrize(
-    ("status_code", "error_type"),
+    ("status_code", "error_code"),
     [
-        (400, GeminiRequestRejected),
-        (401, GeminiAuthenticationError),
-        (403, GeminiAuthenticationError),
-        (404, GeminiModelUnavailable),
-        (429, GeminiRateLimited),
-        (503, GeminiServiceError),
+        (400, "GEMINI_REQUEST_REJECTED"),
+        (401, "GEMINI_AUTHENTICATION_FAILED"),
+        (403, "GEMINI_AUTHENTICATION_FAILED"),
+        (404, "GEMINI_MODEL_UNAVAILABLE"),
+        (429, "GEMINI_RATE_LIMITED"),
+        (503, "GEMINI_UNAVAILABLE"),
     ],
 )
 def test_gemini_http_errors_are_classified_without_exposing_provider_message(
     monkeypatch,
     caplog,
     status_code: int,
-    error_type: type[Exception],
+    error_code: str,
 ) -> None:
     class FakeAPIError(Exception):
         def __init__(
@@ -191,11 +184,12 @@ def test_gemini_http_errors_are_classified_without_exposing_provider_message(
     models.interaction_error = FakeAPIError(status_code)
     analyzer, _ = make_analyzer(models)
 
-    with pytest.raises(error_type) as error:
+    with pytest.raises(GeminiServiceError) as error:
         asyncio.run(
             analyzer.analyze([(0, "Allow group Devs to inspect instances in tenancy")])
         )
 
+    assert error.value.code == error_code
     assert "private upstream detail" not in str(error.value)
     assert error.value.operation == "interactions_create"
     assert error.value.upstream_status == "UPSTREAM_STATUS"
@@ -218,10 +212,12 @@ def test_schema_error_is_categorized_without_logging_upstream_text(
     models.interaction_error = FakeAPIError()
     analyzer, _ = make_analyzer(models)
 
-    with pytest.raises(gemini_service.GeminiSchemaRejected):
+    with pytest.raises(GeminiServiceError) as error:
         asyncio.run(
             analyzer.analyze([(0, "Allow group Devs to inspect instances in tenancy")])
         )
+
+    assert error.value.code == "GEMINI_SCHEMA_REJECTED"
 
     assert "category schema" in caplog.text
     assert "INVALID_ARGUMENT" in caplog.text
@@ -253,10 +249,12 @@ def test_schema_error_category_can_come_from_error_details(monkeypatch, caplog) 
     models.interaction_error = FakeAPIError()
     analyzer, _ = make_analyzer(models)
 
-    with pytest.raises(gemini_service.GeminiSchemaRejected):
+    with pytest.raises(GeminiServiceError) as error:
         asyncio.run(
             analyzer.analyze([(0, "Allow group Devs to inspect instances in tenancy")])
         )
+
+    assert error.value.code == "GEMINI_SCHEMA_REJECTED"
 
     assert "category schema" in caplog.text
     assert "fieldViolations" not in caplog.text
@@ -272,10 +270,12 @@ def test_total_timeout_is_enforced_and_logs_operation(caplog) -> None:
 
     analyzer, _ = make_analyzer(SlowModels(), timeout_seconds=0.001)
 
-    with pytest.raises(GeminiTimeout):
+    with pytest.raises(GeminiServiceError) as error:
         asyncio.run(
             analyzer.analyze([(0, "Allow group Devs to inspect instances in tenancy")])
         )
+
+    assert error.value.code == "GEMINI_TIMEOUT"
 
     assert (
         "model gemini-3.5-flash-lite operation count_tokens exceeded total timeout"
@@ -289,10 +289,12 @@ def test_unexpected_error_logs_only_exception_type(caplog) -> None:
     models.interaction_error = RuntimeError("statement-secret-and-api-key")
     analyzer, _ = make_analyzer(models)
 
-    with pytest.raises(GeminiServiceError):
+    with pytest.raises(GeminiServiceError) as error:
         asyncio.run(
             analyzer.analyze([(0, "Allow group Devs to inspect instances in tenancy")])
         )
+
+    assert error.value.code == "GEMINI_UNAVAILABLE"
 
     assert "RuntimeError" in caplog.text
     assert "statement-secret-and-api-key" not in caplog.text
@@ -303,10 +305,12 @@ def test_value_error_from_sdk_is_a_rejected_request(caplog) -> None:
     models.count_error = ValueError("private statement text")
     analyzer, _ = make_analyzer(models)
 
-    with pytest.raises(gemini_service.GeminiRequestRejected):
+    with pytest.raises(GeminiServiceError) as error:
         asyncio.run(
             analyzer.analyze([(0, "Allow group Devs to inspect instances in tenancy")])
         )
+
+    assert error.value.code == "GEMINI_REQUEST_REJECTED"
 
     assert "count_tokens" in caplog.text
     assert "ValueError" in caplog.text
@@ -321,10 +325,12 @@ def test_connection_error_logs_exception_types_only(caplog) -> None:
     models.count_error = ConnectError("private endpoint and policy content")
     analyzer, _ = make_analyzer(models)
 
-    with pytest.raises(GeminiConnectionFailed):
+    with pytest.raises(GeminiServiceError) as error:
         asyncio.run(
             analyzer.analyze([(0, "Allow group Devs to inspect instances in tenancy")])
         )
+
+    assert error.value.code == "GEMINI_CONNECTION_FAILED"
 
     assert "ConnectError" in caplog.text
     assert "private endpoint and policy content" not in caplog.text

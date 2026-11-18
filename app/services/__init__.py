@@ -1,2 +1,2 @@
-"""Business services for NetworkLab tools."""
+"""Servicos das ferramentas do NetworkLab."""
 

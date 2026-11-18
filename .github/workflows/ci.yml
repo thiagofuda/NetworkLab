@@ -132,9 +132,11 @@ jobs:
           compose_file=/opt/networklab/compose.prod.yaml
           api_container=$(docker compose -f "$compose_file" ps -q api)
           previous_image=$(docker inspect --format='{{.Image}}' "$api_container")
+          # Esta tag guarda apenas a imagem da API. O Compose fica fora do rollback.
           docker image tag "$previous_image" "${IMAGE_NAME}:rollback"
 
           docker compose -f "$compose_file" pull api
+          # A API recriada pode mudar de IP. Reiniciar o Nginx refaz a busca do upstream.
           if ! docker compose -f "$compose_file" up -d --no-deps --wait api; then
             IMAGE_TAG=rollback docker compose -f "$compose_file" up -d --no-deps --wait api
             docker compose -f "$compose_file" restart nginx

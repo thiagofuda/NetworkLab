@@ -6,17 +6,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.routers.oci_iam_policy import MAX_BODY_SIZE, MAX_JSON_DEPTH
 from app.schemas.oci_iam_policy import GeminiPolicyAnalysis, GeminiPolicyFinding
-from app.services.gemini_service import (
-    GeminiAuthenticationError,
-    GeminiConnectionFailed,
-    GeminiModelUnavailable,
-    GeminiNotConfigured,
-    GeminiRateLimited,
-    GeminiRequestRejected,
-    GeminiSchemaRejected,
-    GeminiServiceError,
-    GeminiTimeout,
-)
+from app.services.gemini_service import GeminiServiceError
 
 # O analyzer falso deixa os testes do endpoint independentes de rede e de quota.
 
@@ -189,6 +179,32 @@ def test_multibyte_statement_is_accepted(fake_analyzer: FakeAnalyzer) -> None:
     assert fake_analyzer.statements == [(0, statement)]
 
 
+@pytest.mark.parametrize(
+    ("path", "status", "detail"),
+    [
+        ("/api/aws/iam-validate", 413, "Request body exceeds 32 KiB."),
+        ("/api/aws/terraform-plan-analyze", 415, "UNSUPPORTED_MEDIA_TYPE"),
+        (ENDPOINT, 415, "UNSUPPORTED_MEDIA_TYPE"),
+    ],
+)
+def test_body_limit_and_media_type_keep_route_precedence(
+    path: str, status: int, detail: str, fake_analyzer: FakeAnalyzer
+) -> None:
+    response = client.post(
+        path,
+        content=b"{}",
+        headers={"Content-Type": "application/xml", "Content-Length": "1048577"},
+    )
+
+    assert response.status_code == status
+    response_detail = response.json()["detail"]
+    if isinstance(response_detail, dict):
+        assert response_detail["code"] == detail
+    else:
+        assert response_detail == detail
+    assert fake_analyzer.statements == []
+
+
 def test_total_text_and_body_limits(fake_analyzer: FakeAnalyzer) -> None:
     total_limit_response = post_statements(
         ["Allow group Devs to inspect " + "x" * 1900 for _ in range(9)]
@@ -206,26 +222,26 @@ def test_total_text_and_body_limits(fake_analyzer: FakeAnalyzer) -> None:
 
 
 @pytest.mark.parametrize(
-    ("error", "status_code", "error_code"),
+    ("status_code", "error_code"),
     [
-        (GeminiNotConfigured(), 503, "GEMINI_NOT_CONFIGURED"),
-        (GeminiAuthenticationError(), 503, "GEMINI_AUTHENTICATION_FAILED"),
-        (GeminiConnectionFailed(), 503, "GEMINI_CONNECTION_FAILED"),
-        (GeminiModelUnavailable(), 503, "GEMINI_MODEL_UNAVAILABLE"),
-        (GeminiRequestRejected(), 502, "GEMINI_REQUEST_REJECTED"),
-        (GeminiSchemaRejected(), 502, "GEMINI_SCHEMA_REJECTED"),
-        (GeminiRateLimited(), 429, "GEMINI_RATE_LIMITED"),
-        (GeminiTimeout(), 504, "GEMINI_TIMEOUT"),
-        (GeminiServiceError(), 503, "GEMINI_UNAVAILABLE"),
+        (503, "GEMINI_NOT_CONFIGURED"),
+        (503, "GEMINI_AUTHENTICATION_FAILED"),
+        (503, "GEMINI_CONNECTION_FAILED"),
+        (503, "GEMINI_MODEL_UNAVAILABLE"),
+        (502, "GEMINI_REQUEST_REJECTED"),
+        (502, "GEMINI_SCHEMA_REJECTED"),
+        (429, "GEMINI_RATE_LIMITED"),
+        (504, "GEMINI_TIMEOUT"),
+        (413, "GEMINI_TOKEN_LIMIT_EXCEEDED"),
+        (503, "GEMINI_UNAVAILABLE"),
     ],
 )
 def test_gemini_failures_map_to_stable_http_errors(
     fake_analyzer: FakeAnalyzer,
-    error: Exception,
     status_code: int,
     error_code: str,
 ) -> None:
-    fake_analyzer.error = error
+    fake_analyzer.error = GeminiServiceError(error_code)
 
     response = post_statements([VALID_STATEMENTS[0]])
 
@@ -247,7 +263,7 @@ def test_gemini_error_returns_safe_upstream_metadata(
     assert response.status_code == 503
     assert response.json()["detail"] == {
         "code": "GEMINI_UNAVAILABLE",
-        "message": GeminiServiceError.public_message,
+        "message": "The Gemini analysis service is unavailable.",
         "operation": "interactions_create",
         "upstream_status": "UNAVAILABLE",
     }

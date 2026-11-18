@@ -236,6 +236,9 @@ def _identify_provider(
     address_names: dict[str, str] = {}
     metadata_resource_count = 0
 
+    # Registra os providers de todas as fontes para detectar planos mistos.
+    # Para o mesmo endereco, a ultima fonte com nome valido sobrescreve a anterior:
+    # configuracao, valores planejados, estado anterior e mudancas de recursos.
     configuration = plan.get("configuration")
     provider_configs = _provider_config_names(configuration)
     if isinstance(configuration, dict):
@@ -266,12 +269,14 @@ def _identify_provider(
             resource_change.get("address"),
         )
         address = resource_change.get("address")
+        # Uma instancia pode ter um indice que falta no endereco da configuracao.
         if isinstance(address, str) and address not in address_names:
             for config_address, provider_name in tuple(address_names.items()):
                 if address.startswith(f"{config_address}["):
                     address_names[address] = provider_name
                     break
 
+    # Em planos sem recursos, a lista declarada pode ser a unica fonte.
     if metadata_resource_count == 0:
         for provider_name in provider_configs.values():
             kind = _provider_kind(provider_name)

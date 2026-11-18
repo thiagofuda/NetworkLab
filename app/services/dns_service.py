@@ -117,6 +117,8 @@ def lookup_dns(
         )
 
     try:
+        # Usa o resolvedor do ambiente, mas evita acrescentar sufixos de busca
+        # do sistema ao nome pedido pelo usuario.
         resolver = dns.resolver.Resolver(configure=True)
         answer = resolver.resolve(
             normalized_domain,

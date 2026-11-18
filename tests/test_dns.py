@@ -69,6 +69,7 @@ def test_health_responds_while_dns_resolver_waits(
         loop = asyncio.get_running_loop()
         started = asyncio.Event()
 
+        # Mantem o DNS pendente ate verificar a resposta de /health.
         def wait_for_release(*args: object, **kwargs: object) -> object:
             loop.call_soon_threadsafe(started.set)
             assert released.wait(timeout=2), "Health did not respond during DNS lookup"

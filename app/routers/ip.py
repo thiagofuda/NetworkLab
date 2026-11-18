@@ -16,7 +16,7 @@ templates = Jinja2Templates(directory=templates_directory)
 
 
 def get_request_ip_information(request: Request) -> IpInformation:
-    # Isola a extração dos dados da requisição para reaproveitar nas rotas HTML e JSON.
+    # Isola a extracao dos dados da requisicao para reaproveitar nas rotas HTML e JSON.
     client_ip_address = request.client.host if request.client else None
     return get_ip_information(
         client_ip_address=client_ip_address,

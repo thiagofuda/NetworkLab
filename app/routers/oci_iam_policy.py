@@ -1,11 +1,14 @@
 import json
-from email.message import Message
 from typing import NoReturn
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import ValidationError
-from starlette.requests import ClientDisconnect
 
+from app.routers.request_body import (
+    decode_utf8,
+    read_limited_body,
+    validate_json_headers,
+)
 from app.schemas.oci_iam_policy import (
     OciPolicyAnalysisRequest,
     OciPolicyAnalysisResponse,
@@ -14,11 +17,23 @@ from app.schemas.oci_iam_policy import (
 from app.services.gemini_service import GeminiServiceError
 from app.services.oci_iam_policy_service import (
     PolicyInputError,
+    PolicyTextError,
     analyze_oci_iam_policy,
 )
 
 router = APIRouter()
 MAX_BODY_SIZE = 32 * 1024
+REQUEST_ERROR_MESSAGES = {
+    "INVALID_CONTENT_LENGTH": "Content-Length is invalid.",
+    "PAYLOAD_TOO_LARGE": "The request body exceeds 32 KiB.",
+    "INCOMPLETE_BODY": "The request body is incomplete.",
+    "EMPTY_BODY": "The request body is required.",
+    "INVALID_UTF8": "The request body must be valid UTF-8.",
+    "UNSUPPORTED_MEDIA_TYPE": (
+        "Content-Type must be application/json with UTF-8 encoding."
+    ),
+    "UNSUPPORTED_CONTENT_ENCODING": "Content-Encoding is not supported.",
+}
 MAX_JSON_DEPTH = 20
 # Mantem os erros esperados visiveis no contrato OpenAPI.
 ERROR_RESPONSES = {
@@ -90,83 +105,22 @@ def _validate_json_depth(payload: object) -> None:
             pending.extend((child, depth + 1) for child in children)
 
 
-def _validate_headers(request: Request) -> None:
-    """Aceita somente JSON UTF-8 sem compressao ou cabecalhos duplicados."""
-    content_types = request.headers.getlist("content-type")
-    if len(content_types) != 1:
-        raise _http_error(
-            415,
-            "UNSUPPORTED_MEDIA_TYPE",
-            "Content-Type must be application/json with UTF-8 encoding.",
-        )
+def _request_error(status_code: int, code: str) -> HTTPException:
+    return _http_error(status_code, code, REQUEST_ERROR_MESSAGES[code])
 
-    content_type = Message()
-    content_type["Content-Type"] = content_types[0]
-    parameters = content_type.get_params() or []
-    # O parser de email interpreta parametros Content-Type sem dividir valores a mao.
-    charsets = [value for name, value in parameters[1:] if name.lower() == "charset"]
-    if (
-        not parameters
-        or parameters[0][0].lower() != "application/json"
-        or len(charsets) > 1
-        or any(
-            not isinstance(value, str) or value.lower() != "utf-8" for value in charsets
-        )
-        or any(name.lower() != "charset" for name, _ in parameters[1:])
-    ):
-        raise _http_error(
-            415,
-            "UNSUPPORTED_MEDIA_TYPE",
-            "Content-Type must be application/json with UTF-8 encoding.",
-        )
 
-    encodings = request.headers.getlist("content-encoding")
-    if len(encodings) > 1 or (encodings and encodings[0].lower() != "identity"):
-        raise _http_error(
-            415,
-            "UNSUPPORTED_CONTENT_ENCODING",
-            "Content-Encoding is not supported.",
-        )
+def _invalid_statements() -> HTTPException:
+    return _http_error(
+        422,
+        "INVALID_STATEMENTS",
+        "The request must contain 1 to 50 valid OCI policy statements "
+        "within the configured limits.",
+    )
 
 
 async def _read_request(request: Request) -> OciPolicyAnalysisRequest:
-    """Le o corpo em partes para impor o limite antes de decodificar o JSON."""
-    lengths = request.headers.getlist("content-length")
-    if len(lengths) > 1 or any(
-        not length.isascii() or not length.isdecimal() for length in lengths
-    ):
-        raise _http_error(400, "INVALID_CONTENT_LENGTH", "Content-Length is invalid.")
-    if lengths and (len(lengths[0]) > 10 or int(lengths[0]) > MAX_BODY_SIZE):
-        raise _http_error(
-            413,
-            "PAYLOAD_TOO_LARGE",
-            "The request body exceeds 32 KiB.",
-        )
-
-    body = bytearray()
-    try:
-        # Content-Length pode faltar; por isso o limite tambem e conferido por chunk.
-        async for chunk in request.stream():
-            if len(body) + len(chunk) > MAX_BODY_SIZE:
-                raise _http_error(
-                    413,
-                    "PAYLOAD_TOO_LARGE",
-                    "The request body exceeds 32 KiB.",
-                )
-            body.extend(chunk)
-    except ClientDisconnect as error:
-        raise _http_error(
-            400, "INCOMPLETE_BODY", "The request body is incomplete."
-        ) from error
-
-    if not body:
-        raise _http_error(400, "EMPTY_BODY", "The request body is required.")
-    try:
-        text = body.decode("utf-8")
-    except UnicodeDecodeError as error:
-        raise _http_error(
-            400, "INVALID_UTF8", "The request body must be valid UTF-8."
-        ) from error
+    body = await read_limited_body(request, MAX_BODY_SIZE, _request_error)
+    text = decode_utf8(body, _request_error)
     try:
         payload = json.loads(
             text,
@@ -181,12 +135,7 @@ async def _read_request(request: Request) -> OciPolicyAnalysisRequest:
     try:
         return OciPolicyAnalysisRequest.model_validate(payload)
     except ValidationError as error:
-        raise _http_error(
-            422,
-            "INVALID_STATEMENTS",
-            "The request must contain 1 to 50 valid OCI policy statements "
-            "within the configured limits.",
-        ) from error
+        raise _invalid_statements() from error
 
 
 @router.post(
@@ -215,15 +164,18 @@ async def analyze_oci_iam_policy_request(
     request: Request,
 ) -> OciPolicyAnalysisResponse:
     """Valida a requisicao e traduz erros internos para a resposta publica."""
-    _validate_headers(request)
+    # Nesta rota, tipo de conteudo invalido tem prioridade sobre o tamanho.
+    validate_json_headers(request, _request_error)
     policy_request = await _read_request(request)
     analyzer = request.app.state.oci_iam_policy_analyzer
     try:
         return await analyze_oci_iam_policy(policy_request.statements, analyzer)
+    except PolicyTextError as error:
+        raise _invalid_statements() from error
     except PolicyInputError as error:
         raise _http_error(422, "INVALID_STATEMENTS", str(error)) from error
     except GeminiServiceError as error:
-        # A resposta usa mensagens públicas e metadados controlados.
+        # A resposta usa mensagens publicas e metadados controlados.
         detail = {
             "code": error.code,
             "message": error.public_message,

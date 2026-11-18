@@ -17,7 +17,6 @@ from app.services.gemini_service import GeminiPolicyAnalyzer
 
 def create_app() -> FastAPI:
     """Monta a aplicacao, seus servicos compartilhados e routers."""
-    # Centraliza a criação da aplicação para facilitar testes e futura evolução.
     settings = get_settings()
     application = FastAPI(
         title=settings.app_name,
@@ -36,7 +35,6 @@ def create_app() -> FastAPI:
         StaticFiles(directory=static_directory),
         name="static",
     )
-    # Cada router é registrado aqui para manter o ponto de entrada explícito.
     application.include_router(home_router)
     application.include_router(cidr_router)
     application.include_router(dns_router)

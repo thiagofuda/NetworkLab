@@ -7,7 +7,6 @@ client = TestClient(app)
 
 
 def test_ip_page_displays_request_information() -> None:
-    # Valida a renderizacao da interface HTML com dados principais da requisicao.
     response = client.get(
         "/tools/ip",
         headers={"User-Agent": "NetworkLab Test", "Accept-Language": "en-US"},
@@ -44,7 +43,6 @@ def test_ip_api_openapi_documents_plain_text() -> None:
 
 
 def test_ip_page_escapes_header_html() -> None:
-    # Confirma que o template nao reflete HTML bruto enviado pelo cliente.
     response = client.get(
         "/tools/ip",
         headers={"Accept-Language": "<script>alert('test')</script>"},
@@ -56,7 +54,6 @@ def test_ip_page_escapes_header_html() -> None:
 
 
 def test_ip_page_only_exposes_allowlisted_headers() -> None:
-    # Garante que headers de autenticacao e headers customizados nao sao publicados.
     response = client.get(
         "/tools/ip",
         headers={

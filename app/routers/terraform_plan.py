@@ -1,8 +1,10 @@
-from email.message import Message
-
 from fastapi import APIRouter, HTTPException, Request
-from starlette.requests import ClientDisconnect
 
+from app.routers.request_body import (
+    decode_utf8,
+    read_limited_body,
+    validate_json_headers,
+)
 from app.schemas.terraform_plan import (
     TerraformPlanErrorResponse,
     TerraformPlanResult,
@@ -15,6 +17,17 @@ from app.services.terraform_plan_service import (
 
 router = APIRouter()
 MAX_BODY_SIZE = 1024 * 1024
+REQUEST_ERROR_MESSAGES = {
+    "INVALID_CONTENT_LENGTH": "Content-Length is invalid.",
+    "PAYLOAD_TOO_LARGE": "The request body exceeds 1 MiB.",
+    "INCOMPLETE_BODY": "The request body is incomplete.",
+    "EMPTY_BODY": "The request body is required.",
+    "INVALID_UTF8": "The request body must be valid UTF-8.",
+    "UNSUPPORTED_MEDIA_TYPE": (
+        "Content-Type must be application/json with UTF-8 encoding."
+    ),
+    "UNSUPPORTED_CONTENT_ENCODING": "Content-Encoding is not supported.",
+}
 ERROR_RESPONSES = {
     400: {
         "model": TerraformPlanErrorResponse,
@@ -46,83 +59,18 @@ def _http_error(status_code: int, code: str, message: str) -> HTTPException:
     )
 
 
-def _validate_content_type(request: Request) -> None:
-    content_types = request.headers.getlist("content-type")
-    if len(content_types) != 1:
-        raise _http_error(
-            415,
-            "UNSUPPORTED_MEDIA_TYPE",
-            "Content-Type must be application/json with UTF-8 encoding.",
-        )
-
-    content_type = Message()
-    content_type["Content-Type"] = content_types[0]
-    parameters = content_type.get_params() or []
-    charsets = [value for name, value in parameters[1:] if name.lower() == "charset"]
-    if (
-        not parameters
-        or parameters[0][0].lower() != "application/json"
-        or len(charsets) > 1
-        or any(
-            not isinstance(value, str) or value.lower() != "utf-8" for value in charsets
-        )
-        or any(name.lower() != "charset" for name, _ in parameters[1:])
-    ):
-        raise _http_error(
-            415,
-            "UNSUPPORTED_MEDIA_TYPE",
-            "Content-Type must be application/json with UTF-8 encoding.",
-        )
-
-    encodings = request.headers.getlist("content-encoding")
-    if len(encodings) > 1 or (encodings and encodings[0].lower() != "identity"):
-        raise _http_error(
-            415,
-            "UNSUPPORTED_CONTENT_ENCODING",
-            "Content-Encoding is not supported.",
-        )
+def _request_error(status_code: int, code: str) -> HTTPException:
+    return _http_error(status_code, code, REQUEST_ERROR_MESSAGES[code])
 
 
 async def _read_plan_body(request: Request) -> str:
-    lengths = request.headers.getlist("content-length")
-    if len(lengths) > 1 or any(
-        not length.isascii() or not length.isdecimal() for length in lengths
-    ):
-        raise _http_error(400, "INVALID_CONTENT_LENGTH", "Content-Length is invalid.")
-    if lengths and (len(lengths[0]) > 10 or int(lengths[0]) > MAX_BODY_SIZE):
-        raise _http_error(
-            413,
-            "PAYLOAD_TOO_LARGE",
-            "The request body exceeds 1 MiB.",
-        )
-
-    body = bytearray()
-    try:
-        async for chunk in request.stream():
-            if len(body) + len(chunk) > MAX_BODY_SIZE:
-                raise _http_error(
-                    413,
-                    "PAYLOAD_TOO_LARGE",
-                    "The request body exceeds 1 MiB.",
-                )
-            body.extend(chunk)
-    except ClientDisconnect as error:
-        raise _http_error(
-            400, "INCOMPLETE_BODY", "The request body is incomplete."
-        ) from error
-
-    if not body:
-        raise _http_error(400, "EMPTY_BODY", "The request body is required.")
-    try:
-        return body.decode("utf-8")
-    except UnicodeDecodeError as error:
-        raise _http_error(
-            400, "INVALID_UTF8", "The request body must be valid UTF-8."
-        ) from error
+    body = await read_limited_body(request, MAX_BODY_SIZE, _request_error)
+    return decode_utf8(body, _request_error)
 
 
 async def _analyze_request(request: Request, provider: str) -> TerraformPlanResult:
-    _validate_content_type(request)
+    # Nesta rota, tipo de conteudo invalido tem prioridade sobre o tamanho.
+    validate_json_headers(request, _request_error)
     text = await _read_plan_body(request)
     try:
         return analyze_terraform_plan(text, provider)

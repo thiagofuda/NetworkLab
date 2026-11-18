@@ -23,7 +23,7 @@ HTTP_STATUS_BY_DNS_STATUS = {
 
 
 @router.get("/tools/dns", response_class=HTMLResponse, include_in_schema=False)
-# O resolvedor é síncrono. O FastAPI executa handlers def no pool de threads.
+# O resolvedor e sincrono. O FastAPI executa handlers def no pool de threads.
 def show_dns_lookup(
     request: Request,
     domain: str | None = None,
