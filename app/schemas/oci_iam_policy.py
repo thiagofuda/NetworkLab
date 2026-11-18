@@ -10,24 +10,11 @@ PolicyStatement = Annotated[
 
 
 class OciPolicyAnalysisRequest(BaseModel):
-    """Entrada publica com limites por statement e para o conjunto completo."""
+    """Entrada publica com limites por statement e quantidade de itens."""
 
     model_config = ConfigDict(extra="forbid")
 
     statements: list[PolicyStatement] = Field(min_length=1, max_length=50)
-
-    @model_validator(mode="after")
-    def check_total_statement_size(self) -> "OciPolicyAnalysisRequest":
-        """Conta bytes UTF-8, nao caracteres, para limitar o corpo enviado."""
-        try:
-            total_bytes = sum(
-                len(statement.encode("utf-8")) for statement in self.statements
-            )
-        except UnicodeEncodeError as error:
-            raise ValueError("Statements must be valid UTF-8.") from error
-        if total_bytes > 16 * 1024:
-            raise ValueError("The combined statement text exceeds 16 KiB.")
-        return self
 
 
 class GeminiPolicyFinding(BaseModel):

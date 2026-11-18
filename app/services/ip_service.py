@@ -28,7 +28,6 @@ def get_ip_information(
         ip_address=client_ip_address or "unknown",
         user_agent=user_agent or "unknown",
         headers=displayed_headers,
-        # Padroniza o timestamp em UTC
         requested_at=datetime.now(UTC),
     )
 

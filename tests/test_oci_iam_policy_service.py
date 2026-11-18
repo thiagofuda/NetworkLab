@@ -196,6 +196,23 @@ def test_different_policy_scopes_make_redundancy_inconclusive(
     assert result.findings[0].suggested_keep_indexes == []
 
 
+def test_unclosed_quote_cannot_support_a_redundancy_suggestion() -> None:
+    analyzer = FakeGeminiAnalyzer(
+        GeminiPolicyAnalysis(findings=[finding(indexes=[0, 1], suggestions=[1])])
+    )
+    statements = [
+        f"Allow group Devs to {verb} instances in tenancy where target.name='DEV"
+        for verb in ("inspect", "manage")
+    ]
+
+    result = asyncio.run(analyze_oci_iam_policy(statements, analyzer))
+
+    assert result.status == "inconclusive"
+    assert result.findings[0].assessment == "inconclusive"
+    assert result.findings[0].suggested_keep_indexes == []
+    assert result.findings[0].review_only is True
+
+
 def test_invalid_gemini_indexes_return_inconclusive_without_ai_findings() -> None:
     analyzer = FakeGeminiAnalyzer(
         GeminiPolicyAnalysis(findings=[finding(indexes=[0, 8])])

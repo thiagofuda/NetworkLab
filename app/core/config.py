@@ -6,7 +6,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Configuracoes carregadas do ambiente e, em desenvolvimento, do .env."""
 
     app_name: str = "InfraLab"
     app_env: Literal["development", "test", "production"] = "development"

@@ -1,2 +1,2 @@
-"""NetworkLab API package."""
+"""Pacote da API do NetworkLab."""
 

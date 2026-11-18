@@ -1,2 +1,2 @@
-"""API routes."""
+"""Rotas da API."""
 

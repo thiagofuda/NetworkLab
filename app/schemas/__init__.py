@@ -1,2 +1,2 @@
-"""API schemas."""
+"""Schemas da API."""
 

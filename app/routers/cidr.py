@@ -47,7 +47,7 @@ async def read_cidr_information(cidr: str | None = None) -> CidrInformation:
     try:
         return calculate_cidr(cidr or "")
     except ValueError as error:
-        # Converte entrada em uma resposta HTTP clara.
+        # Converte entrada em uma resposta HTTP
         raise HTTPException(
             status_code=422,
             detail=INVALID_CIDR_MESSAGE,

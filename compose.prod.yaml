@@ -20,6 +20,7 @@ services:
       - --port
       - "8000"
       - --proxy-headers
+      # A API fica sem porta publicada. O Nginx sobrescreve os headers de origem.
       - "--forwarded-allow-ips=*"
 
   nginx:

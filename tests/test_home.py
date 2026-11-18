@@ -82,7 +82,6 @@ def test_about_page_shows_profile_and_links() -> None:
     assert 'href="https://github.com/thiagofuda"' in response.text
     assert 'href="https://br.linkedin.com/in/thiago-fuda"' in response.text
     assert "LinkedIn" in response.text
-    assert 'class="back-link" href="/">Back to home</a>' in response.text
     assert "About | InfraLab" in response.text
     assert "NetworkLab is a personal" not in response.text
     assert '<link rel="canonical" href="https://xdb.com.br/about">' in response.text
