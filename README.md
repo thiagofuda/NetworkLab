@@ -4,7 +4,7 @@ I've been working on this personal lab for a while. It started with a few networ
 
 I had more time to work on it during my vacation, so I decided to put it online.
 
-https://xdb.com.br
+https://infralab.fuda.com.br
 
 ## Available tools
 
@@ -19,26 +19,26 @@ https://xdb.com.br
 
 The networking tools have simple web pages. The others are APIs that can be called from a terminal or a script.
 
-Endpoints and request formats are available at https://xdb.com.br/docs.
+Endpoints and request formats are available at https://infralab.fuda.com.br/docs.
 
 ## Usage examples
 
 ### IP Information
 
 ```bash
-curl https://xdb.com.br/api/ip
+curl https://infralab.fuda.com.br/api/ip
 ```
 
 ### CIDR Calculator
 
 ```bash
-curl 'https://xdb.com.br/api/cidr?cidr=192.168.10.25%2F24'
+curl 'https://infralab.fuda.com.br/api/cidr?cidr=192.168.10.25%2F24'
 ```
 
 ### DNS Lookup
 
 ```bash
-curl 'https://xdb.com.br/api/dns?domain=example.com&record_type=MX'
+curl 'https://infralab.fuda.com.br/api/dns?domain=example.com&record_type=MX'
 ```
 
 ### AWS IAM Policy Validator
@@ -59,7 +59,7 @@ Example policy JSON (`policy.json`):
 ```
 
 ```bash
-curl -X POST 'https://xdb.com.br/api/aws/iam-validate' \
+curl -X POST 'https://infralab.fuda.com.br/api/aws/iam-validate' \
   -H 'Content-Type: text/plain' \
   --data-binary @policy.json
 ```
@@ -71,7 +71,7 @@ Example requests with a Terraform Plan JSON file (`plan.json`), such as the outp
 **AWS**
 
 ```bash
-curl -X POST 'https://xdb.com.br/api/aws/terraform-plan-analyze' \
+curl -X POST 'https://infralab.fuda.com.br/api/aws/terraform-plan-analyze' \
   -H 'Content-Type: application/json' \
   --data-binary @plan.json
 ```
@@ -79,7 +79,7 @@ curl -X POST 'https://xdb.com.br/api/aws/terraform-plan-analyze' \
 **OCI**
 
 ```bash
-curl -X POST 'https://xdb.com.br/api/oci/terraform-plan-analyze' \
+curl -X POST 'https://infralab.fuda.com.br/api/oci/terraform-plan-analyze' \
   -H 'Content-Type: application/json' \
   --data-binary @plan.json
 ```
@@ -99,7 +99,7 @@ Example OCI policy (`oci-policy.json`):
 ```
 
 ```bash
-curl -X POST 'https://xdb.com.br/api/oci/iam-policy-analyze' \
+curl -X POST 'https://infralab.fuda.com.br/api/oci/iam-policy-analyze' \
   -H 'Content-Type: application/json' \
   --data-binary @oci-policy.json
 ```
