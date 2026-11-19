@@ -1,3 +1,5 @@
+from xml.etree import ElementTree
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -79,7 +81,28 @@ def test_robots_txt_allows_crawling() -> None:
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/plain")
-    assert response.text == "User-agent: *\nAllow: /\n"
+    assert response.text == (
+        "User-agent: *\nAllow: /\nSitemap: https://infralab.fuda.com.br/sitemap.xml\n"
+    )
+
+
+def test_sitemap_lists_public_html_pages() -> None:
+    response = client.get("/sitemap.xml")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/xml"
+    root = ElementTree.fromstring(response.content)
+    namespace = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
+    assert root.tag == f"{namespace}urlset"
+    assert [
+        element.text for element in root.findall(f"{namespace}url/{namespace}loc")
+    ] == [
+        "https://infralab.fuda.com.br/",
+        "https://infralab.fuda.com.br/about",
+        "https://infralab.fuda.com.br/tools/ip",
+        "https://infralab.fuda.com.br/tools/cidr",
+        "https://infralab.fuda.com.br/tools/dns",
+    ]
 
 
 def test_about_page_shows_profile_and_links() -> None:
