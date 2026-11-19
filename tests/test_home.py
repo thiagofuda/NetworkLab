@@ -17,10 +17,13 @@ def test_home_page_displays_landing_content_and_real_tool_links() -> None:
     )
     assert "https://github.com/thiagofuda/NetworkLab" in response.text
     assert "https://github.com/thiagofuda/homeLab" in response.text
-    assert "curl https://xdb.com.br/api/ip" in response.text
-    assert "curl 'https://xdb.com.br/api/cidr?cidr=192.168.10.25/24'" in response.text
+    assert "curl https://infralab.fuda.com.br/api/ip" in response.text
     assert (
-        "curl 'https://xdb.com.br/api/dns?domain=example.com&amp;record_type=A'"
+        "curl 'https://infralab.fuda.com.br/api/cidr?cidr=192.168.10.25/24'"
+        in response.text
+    )
+    assert (
+        "curl 'https://infralab.fuda.com.br/api/dns?domain=example.com&amp;record_type=A'"
         in response.text
     )
     assert 'class="brand-name" href="/">InfraLab</a>' in response.text
@@ -29,29 +32,38 @@ def test_home_page_displays_landing_content_and_real_tool_links() -> None:
     assert 'class="tool-item" href="/tools/ip"' in response.text
     assert 'class="tool-item" href="/tools/cidr"' in response.text
     assert 'class="tool-item" href="/tools/dns"' in response.text
-    assert "curl https://xdb.com.br/api/ip" in response.text
-    assert "curl 'https://xdb.com.br/api/cidr?cidr=192.168.10.25/24'" in response.text
+    assert "curl https://infralab.fuda.com.br/api/ip" in response.text
     assert (
-        "curl 'https://xdb.com.br/api/dns?domain=example.com&amp;record_type=A'"
+        "curl 'https://infralab.fuda.com.br/api/cidr?cidr=192.168.10.25/24'"
+        in response.text
+    )
+    assert (
+        "curl 'https://infralab.fuda.com.br/api/dns?domain=example.com&amp;record_type=A'"
         in response.text
     )
     assert "AWS IAM Policy Validator" in response.text
-    assert "https://xdb.com.br/api/aws/iam-validate" in response.text
+    assert "https://infralab.fuda.com.br/api/aws/iam-validate" in response.text
     assert "--data-binary @policy.json" in response.text
     assert "AWS Terraform Plan Inspector" in response.text
     assert "OCI Terraform Plan Inspector" in response.text
-    assert "https://xdb.com.br/api/aws/terraform-plan-analyze" in response.text
-    assert "https://xdb.com.br/api/oci/terraform-plan-analyze" in response.text
+    assert (
+        "https://infralab.fuda.com.br/api/aws/terraform-plan-analyze" in response.text
+    )
+    assert (
+        "https://infralab.fuda.com.br/api/oci/terraform-plan-analyze" in response.text
+    )
     assert "--data-binary @plan.json" in response.text
     assert "OCI IAM Policy Analyzer" in response.text
-    assert "https://xdb.com.br/api/oci/iam-policy-analyze" in response.text
+    assert "https://infralab.fuda.com.br/api/oci/iam-policy-analyze" in response.text
     assert "--data-binary @oci-policy.json" in response.text
     assert "SSL/TLS Checker" in response.text
     assert '<span class="coming-soon">Em breve</span>' in response.text
     assert "Built with" not in response.text
     assert "<footer" not in response.text
     assert "/tools/ssl" not in response.text
-    assert '<link rel="canonical" href="https://xdb.com.br/">' in response.text
+    assert (
+        '<link rel="canonical" href="https://infralab.fuda.com.br/">' in response.text
+    )
 
 
 def test_home_page_serves_landing_stylesheet() -> None:
@@ -84,4 +96,7 @@ def test_about_page_shows_profile_and_links() -> None:
     assert "LinkedIn" in response.text
     assert "About | InfraLab" in response.text
     assert "NetworkLab is a personal" not in response.text
-    assert '<link rel="canonical" href="https://xdb.com.br/about">' in response.text
+    assert (
+        '<link rel="canonical" href="https://infralab.fuda.com.br/about">'
+        in response.text
+    )
